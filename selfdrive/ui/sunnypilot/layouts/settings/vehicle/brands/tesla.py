@@ -20,7 +20,8 @@ class TeslaSettings(BrandSettings):
     self.lkas_title = tr("OEM/LKAS Cooperative Steering (Beta)")
     self.lkas_steering_toggle = toggle_item_sp(self.lkas_title, "", param="TeslaLkasSteering")
     self.coop_steering_toggle = toggle_item_sp(tr("Emulated Cooperative Steering"), "", param="TeslaCoopSteering")
-    self.items = [self.lkas_steering_toggle, self.coop_steering_toggle]
+    self.low_speed_pause_toggle = toggle_item_sp(tr("Low Speed Steering Pause - (Alpha)"), "", param="TeslaLowSpeedSteerPause")
+    self.items = [self.lkas_steering_toggle, self.coop_steering_toggle, self.low_speed_pause_toggle]
 
   def update_settings(self):
     is_metric = ui_state.is_metric
@@ -49,13 +50,22 @@ class TeslaSettings(BrandSettings):
         ).format(lkas_feature=self.lkas_title)}"
     )
 
+    low_speed_pause_desc = (
+      f"{tr('At low speeds, lateral control will pause when driver driver override is detected.')} " +
+      f"{tr('It will then resume when the steering stops rotating.')}"
+    )
+
     enable_offroad_msg = tr("Enable \"Always Offroad\" in Device panel, or turn vehicle off to toggle.")
+
     if not ui_state.is_offroad():
       lkas_desc = f"<b>{enable_offroad_msg}</b><br><br>{lkas_desc}"
       coop_steering_desc = f"<b>{enable_offroad_msg}</b><br><br>{coop_steering_desc}"
+      low_speed_pause_desc = f"<b>{enable_offroad_msg}</b><br><br>{low_speed_pause_desc}"
 
     self.lkas_steering_toggle.set_description(lkas_desc)
     self.coop_steering_toggle.set_description(coop_steering_desc)
+    self.low_speed_pause_toggle.set_description(low_speed_pause_desc)
 
     self.lkas_steering_toggle.action_item.set_enabled(ui_state.is_offroad())
     self.coop_steering_toggle.action_item.set_enabled(ui_state.is_offroad())
+    self.low_speed_pause_toggle.action_item.set_enabled(ui_state.is_offroad())

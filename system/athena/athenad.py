@@ -133,9 +133,6 @@ upload_queue: Queue[UploadItem] = queue.PriorityQueue()
 low_priority_send_queue: Queue[str] = queue.Queue()
 log_recv_queue: Queue[str] = queue.Queue()
 cancelled_uploads: set[str] = set()
-sdp_recv_queue: Queue[str] = queue.Queue()
-sdp_send_queue: Queue[str] = queue.Queue()
-ice_send_queue: Queue[str] = queue.Queue()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
 
@@ -186,7 +183,6 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler4'),
     threading.Thread(target=log_handler, args=(end_event,), name='log_handler'),
     threading.Thread(target=stat_handler, args=(end_event,), name='stat_handler'),
-    # threading.Thread(target=rtc_handler, args=(end_event, sdp_send_queue, sdp_recv_queue, ice_send_queue), name='rtc_handler'),
   ] + [
     threading.Thread(target=jsonrpc_handler, args=(end_event,), name=f'worker_{x}')
     for x in range(HANDLER_THREADS)
@@ -207,30 +203,18 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
       thread.join()
 
 
-def rtc_handler(end_event: threading.Event, sdp_send_queue: queue.Queue, sdp_recv_queue: queue.Queue, ice_recv_queue: queue.Queue) -> None:
-  loop = asyncio.new_event_loop()
-  asyncio.set_event_loop(loop)
-  try:
-    streamer = Streamer(sdp_send_queue, sdp_recv_queue, ice_recv_queue)
-    loop.run_until_complete(streamer.event_loop(end_event))
-  finally:
-    loop.close()
-
 @dispatcher.add_method
-def webrtc(sdp:str):
-  logger = logging.getLogger("webrtcd")
-  logger.warning(f"sdp {sdp=}")
+def webrtc(sdp:str, cameras: list[str], bridge_services_in: list[str], bridge_services_out: list[str]):
   try:
     data = {
       "sdp": sdp,
-      "cameras": ["driver", "wideRoad"],
-      "bridge_services_in": [],
-      "bridge_services_out": []
+      "cameras": cameras,
+      "bridge_services_in": bridge_services_in,
+      "bridge_services_out": bridge_services_out
     }
     response = requests.post("http://0.0.0.0:5001/stream", json=data, timeout=60)
     response.raise_for_status()
     res = response.json()
-    logger.warning(f"sdp {res=}")
     return res
   except Exception as e:
     cloudlog.exception("athena.webrtc.exception")

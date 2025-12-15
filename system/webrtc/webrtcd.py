@@ -129,6 +129,8 @@ class StreamSession:
     config = parse_info_from_offer(sdp)
     builder = WebRTCAnswerBuilder(sdp)
 
+    self.logger = logging.getLogger("webrtcd")
+
     # assert len(cameras) == config.n_expected_camera_tracks, f"Incoming stream has misconfigured number of video tracks. Expected {config.n_expected_camera_tracks}, got {len(cameras)}"
     if len(cameras) != config.n_expected_camera_tracks:
       self.logger.warning(f"Incoming stream mismatch! Expected {config.n_expected_camera_tracks}, got {len(cameras)}. Cameras: {cameras}")
@@ -155,7 +157,6 @@ class StreamSession:
 
     self.audio_output: AudioOutputSpeaker | MediaBlackhole | None = None
     self.run_task: asyncio.Task | None = None
-    self.logger = logging.getLogger("webrtcd")
     self.logger.info("New stream session (%s), cameras %s, audio in %s out %s, incoming services %s, outgoing services %s",
                       self.identifier, cameras, config.incoming_audio_track, config.expected_audio_track, incoming_services, outgoing_services)
 

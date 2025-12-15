@@ -217,12 +217,12 @@ def rtc_handler(end_event: threading.Event, sdp_send_queue: queue.Queue, sdp_rec
     loop.close()
 
 @dispatcher.add_method
-def setSdpAnswer(answer:str):
+def webrtc(sdp:str):
   logger = logging.getLogger("webrtcd")
-  logger.warning(f"setSdpAnswer {answer=}")
+  logger.warning(f"sdp {sdp=}")
   try:
     data = {
-      "sdp": answer,
+      "sdp": sdp,
       "cameras": ["driver", "wideRoad"],
       "bridge_services_in": [],
       "bridge_services_out": []
@@ -230,7 +230,7 @@ def setSdpAnswer(answer:str):
     response = requests.post("http://0.0.0.0:5001/stream", json=data, timeout=5)
     response.raise_for_status()
     res = response.json()
-    logger.warning(f"setSdpAnswer {res=}")
+    logger.warning(f"sdp {res=}")
     return res
   except Exception as e:
     cloudlog.exception("athena.webrtc.exception")

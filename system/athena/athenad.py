@@ -42,6 +42,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.system.version import get_build_metadata
 from openpilot.system.hardware.hw import Paths
 from openpilot.system.athena.streamer import Streamer
+import logging
 
 ATHENA_HOST = os.getenv('ATHENA_HOST', 'wss://athena.comma.ai')
 HANDLER_THREADS = int(os.getenv('HANDLER_THREADS', "4"))
@@ -217,6 +218,8 @@ def rtc_handler(end_event: threading.Event, sdp_send_queue: queue.Queue, sdp_rec
 
 @dispatcher.add_method
 def setSdpAnswer(answer:str):
+  logger = logging.getLogger("webrtcd")
+  logger.warning(f"setSdpAnswer {answer=}")
   try:
     data = {
       "sdp": answer,
@@ -227,7 +230,7 @@ def setSdpAnswer(answer:str):
     response = requests.post("http://127.0.0.1:5001/stream", json=data, timeout=5)
     response.raise_for_status()
     res = response.json()
-    cloudlog.debug(f"returning {res}")
+    logger.warning(f"setSdpAnswer {res=}")
     return res
   except Exception as e:
     cloudlog.exception("athena.webrtc.exception")

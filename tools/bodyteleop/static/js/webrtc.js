@@ -40,11 +40,25 @@ export function createPeerConnection(pc) {
 
   // connect audio / video
   pc.addEventListener('track', function(evt) {
-    console.log("Adding Tracks!")
-    if (evt.track.kind == 'video')
-      document.getElementById('video').srcObject = evt.streams[0];
-    else
+    console.log("Adding Tracks!", evt.track.kind, evt.streams[0].id);
+    if (evt.track.kind === 'video') {
+      const streamId = evt.streams[0].id;
+      if (streamId === 'driver') {
+        document.getElementById('video-driver').srcObject = evt.streams[0];
+      } else if (streamId === 'wideRoad') {
+        document.getElementById('video-wideRoad').srcObject = evt.streams[0];
+      } else {
+        // Fallback or default behavior if IDs don't match
+        console.warn("Unknown stream ID:", streamId);
+        if (!document.getElementById('video-driver').srcObject) {
+             document.getElementById('video-driver').srcObject = evt.streams[0];
+        } else {
+             document.getElementById('video-wideRoad').srcObject = evt.streams[0];
+        }
+      }
+    } else {
       document.getElementById('audio').srcObject = evt.streams[0];
+    }
   });
   return pc;
 }
@@ -173,7 +187,7 @@ export function start(pc, dc) {
   dc.onmessage = function(evt) {
     const text = textDecoder.decode(evt.data);
     const msg = JSON.parse(text);
-    if (carStaterIndex % 100 == 0 && msg.type === 'carState') {
+    if (carStaterIndex % 100 === 0 && msg.type === 'carState') {
       const batteryLevel = Math.round(msg.data.fuelGauge * 100);
       $("#battery").text(batteryLevel + "%");
       batteryPoints.push({'x': new Date().getTime(), 'y': batteryLevel});

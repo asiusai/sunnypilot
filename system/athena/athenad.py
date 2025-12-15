@@ -185,7 +185,7 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler4'),
     threading.Thread(target=log_handler, args=(end_event,), name='log_handler'),
     threading.Thread(target=stat_handler, args=(end_event,), name='stat_handler'),
-    threading.Thread(target=rtc_handler, args=(end_event, sdp_send_queue, sdp_recv_queue, ice_send_queue), name='rtc_handler'),
+    # threading.Thread(target=rtc_handler, args=(end_event, sdp_send_queue, sdp_recv_queue, ice_send_queue), name='rtc_handler'),
   ] + [
     threading.Thread(target=jsonrpc_handler, args=(end_event,), name=f'worker_{x}')
     for x in range(HANDLER_THREADS)
@@ -239,6 +239,23 @@ def getIce():
     return {
       'error': True
     }
+
+
+@dispatcher.add_method
+def forwardWebRTC(sdp: str, cameras: list[str], bridge_services_in: list[str], bridge_services_out: list[str]):
+  try:
+    data = {
+      "sdp": sdp,
+      "cameras": cameras,
+      "bridge_services_in": bridge_services_in,
+      "bridge_services_out": bridge_services_out
+    }
+    response = requests.post("http://127.0.0.1:5001/stream", json=data, timeout=5)
+    response.raise_for_status()
+    return response.json()
+  except Exception as e:
+    cloudlog.exception("athena.forwardWebRTC.exception")
+    return {"error": str(e)}
 
 
 def jsonrpc_handler(end_event: threading.Event, localProxyHandler = None) -> None:

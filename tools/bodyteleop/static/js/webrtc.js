@@ -65,7 +65,7 @@ export function createPeerConnection(pc) {
 
 
 export function negotiate(pc) {
-  return pc.createOffer({offerToReceiveAudio:true, offerToReceiveVideo:false}).then(function(offer) {
+  return pc.createOffer().then(function(offer) {
     return pc.setLocalDescription(offer);
   }).then(function() {
     return new Promise(function(resolve) {
@@ -144,8 +144,8 @@ export function start(pc, dc) {
         });
       }
 
-      pc.addTransceiver('video', { direction: 'sendrecv' });
-      pc.addTransceiver('video', { direction: 'sendrecv' });
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('video', { direction: 'recvonly' });
 
       return negotiate(pc);
     })

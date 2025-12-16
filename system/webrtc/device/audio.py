@@ -154,19 +154,29 @@ class SocketAudioOutput:
     self.rate = rate
     self.channels = channels
     self.tracks_and_tasks: list[tuple[aiortc.MediaStreamTrack, asyncio.Task | None]] = []
+    # Ensure output is s16, 48kHz, mono
+    self.resampler = av.AudioResampler(format='s16', layout='mono', rate=rate)
 
   async def __consume(self, track):
+    count = 0
     while True:
       try:
         frame = await track.recv()
       except aiortc.MediaStreamError:
         return
 
-      data = bytes(frame.planes[0])
       try:
-        self.sock.sendto(data, self.dest)
-      except Exception:
-        pass
+        # Resample to ensure correct format/rate/channels
+        resampled_frames = self.resampler.resample(frame)
+        for r_frame in resampled_frames:
+          data = bytes(r_frame.planes[0])
+          self.sock.sendto(data, self.dest)
+
+        count += 1
+        if count % 200 == 0:
+            print(f"Sent {count} audio frames", flush=True)
+      except Exception as e:
+        print(f"Socket send/resample error: {e}", flush=True)
 
   def hasTrack(self, track: aiortc.MediaStreamTrack) -> bool:
     return any(t == track for t, _ in self.tracks_and_tasks)

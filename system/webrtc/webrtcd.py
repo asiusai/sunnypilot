@@ -186,9 +186,17 @@ class StreamSession:
     except Exception:
       self.logger.exception("Cereal incoming proxy failure")
 
+  active_count = 0
+
   async def run(self):
+    active = False
     try:
       await self.stream.wait_for_connection()
+      active = True
+      StreamSession.active_count += 1
+      if StreamSession.active_count == 1:
+        Params().put_bool("WebRTCOnline", True)
+
       if self.stream.has_messaging_channel():
         if self.incoming_bridge is not None:
           await self.shared_pub_master.add_services_if_needed(self.incoming_bridge_services)
@@ -210,6 +218,11 @@ class StreamSession:
       self.logger.info("Stream session (%s) ended", self.identifier)
     except Exception:
       self.logger.exception("Stream session failure")
+    finally:
+      if active:
+        StreamSession.active_count -= 1
+        if StreamSession.active_count == 0:
+          Params().put_bool("WebRTCOnline", False)
 
   async def post_run_cleanup(self):
     await self.stream.stop()
@@ -269,11 +282,17 @@ async def on_shutdown(app: 'web.Application'):
   del app['streams']
 
 
+from openpilot.common.params import Params
+
+
 def webrtcd_thread(host: str, port: int, debug: bool):
   logging.basicConfig(level=logging.CRITICAL, handlers=[logging.StreamHandler()])
   logging_level = logging.DEBUG if debug else logging.INFO
   logging.getLogger("WebRTCStream").setLevel(logging_level)
   logging.getLogger("webrtcd").setLevel(logging_level)
+
+  # Reset WebRTC online status on startup
+  Params().put_bool("WebRTCOnline", False)
 
   app = web.Application()
 

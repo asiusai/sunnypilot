@@ -122,7 +122,7 @@ class StreamSession:
     from aiortc.mediastreams import VideoStreamTrack, AudioStreamTrack
     from aiortc.contrib.media import MediaBlackhole
     from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
-    from openpilot.system.webrtc.device.audio import AudioInputStreamTrack, AudioOutputSpeaker
+    from openpilot.system.webrtc.device.audio import AudioInputStreamTrack, AudioOutputSpeaker, CerealAudioStreamTrack
     from teleoprtc import WebRTCAnswerBuilder
     from teleoprtc.info import parse_info_from_offer
 
@@ -133,7 +133,16 @@ class StreamSession:
     for cam in cameras:
       builder.add_video_stream(cam, LiveStreamVideoStreamTrack(cam) if not debug_mode else VideoStreamTrack())
     if config.expected_audio_track:
-      builder.add_audio_stream(AudioInputStreamTrack() if not debug_mode else AudioStreamTrack())
+      if not debug_mode:
+        try:
+          audio_track = AudioInputStreamTrack()
+        except Exception:
+          self.logger = logging.getLogger("webrtcd")
+          self.logger.warning("Failed to open audio device, falling back to Cereal audio")
+          audio_track = CerealAudioStreamTrack()
+      else:
+        audio_track = AudioStreamTrack()
+      builder.add_audio_stream(audio_track)
     if config.incoming_audio_track:
       self.audio_output_cls = AudioOutputSpeaker if not debug_mode else MediaBlackhole
       builder.offer_to_receive_audio_stream()

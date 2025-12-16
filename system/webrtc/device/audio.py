@@ -107,3 +107,40 @@ class AudioOutputSpeaker:
     self.stream.stop_stream()
     self.stream.close()
     self.p.terminate()
+
+
+class CerealAudioStreamTrack(aiortc.mediastreams.AudioStreamTrack):
+  def __init__(self, rate: int = 16000, channels: int = 1):
+    super().__init__()
+    from cereal import messaging
+    self.sm = messaging.SubMaster(['rawAudioData'])
+    self.rate = rate
+    self.channels = channels
+    self.buffer = bytearray()
+    self.pts = 0
+    # 20ms frames
+    self.samples_per_frame = int(0.020 * rate)
+    self.bytes_per_frame = self.samples_per_frame * 2 * channels  # 16-bit
+
+  async def recv(self):
+    while len(self.buffer) < self.bytes_per_frame:
+      self.sm.update(0)
+      if self.sm.updated['rawAudioData']:
+        self.buffer.extend(self.sm['rawAudioData'].data)
+
+      if len(self.buffer) < self.bytes_per_frame:
+        await asyncio.sleep(0.005)  # Wait for more data
+
+    # Extract one frame
+    chunk = self.buffer[:self.bytes_per_frame]
+    self.buffer = self.buffer[self.bytes_per_frame:]
+
+    mic_array = np.frombuffer(chunk, dtype=np.int16)
+    mic_array = np.expand_dims(mic_array, axis=0)
+    layout = 'stereo' if self.channels > 1 else 'mono'
+
+    frame = av.AudioFrame.from_ndarray(mic_array, format='s16', layout=layout)
+    frame.rate = self.rate
+    frame.pts = self.pts
+    self.pts += frame.samples
+    return frame

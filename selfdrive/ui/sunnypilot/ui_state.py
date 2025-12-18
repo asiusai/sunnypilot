@@ -23,3 +23,4 @@ class UIStateSP:
     CP_SP_bytes = self.params.get("CarParamsSPPersistent")
     if CP_SP_bytes is not None:
       self.CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP)
+    self.developer_ui = self.params.get("DevUIInfo")

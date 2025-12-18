@@ -427,7 +427,7 @@ def listDataDirectory(prefix='') -> list[str]:
     external_files = scan_dir(Paths.log_root_external(), prefix, Paths.log_root_external())
   except FileNotFoundError:
     external_files = []
-  return sorted(set(internal_files + external_files))
+  return sorted(set(list(internal_files) + list(external_files)))
 
 
 @dispatcher.add_method
@@ -918,7 +918,8 @@ def getParamsAllKeysV1() -> dict[str, str]:
 
 
 @dispatcher.add_method
-def getParams(params_keys: list[str], compression: bool = False) -> str | dict[str, str]:
+def getParams(params_keys: tuple[str], compression: bool = False) -> str | dict[str, str]:
+  params_keys = list(params_keys)
   params = Params()
   available_keys: list[str] = [k.decode('utf-8') for k in Params().all_keys()]
 
@@ -929,6 +930,12 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
       value = params.get(key)
       if value is None:
         continue
+
+      if not isinstance(value, bytes):
+        if isinstance(value, bool):
+          value = b"1" if value else b"0"
+        else:
+          value = str(value).encode('utf-8')
 
       params_dict["params"].append({
         "key": key,

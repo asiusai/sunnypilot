@@ -69,18 +69,18 @@ class NavigationLayout(Widget):
     self._navd.route = None
     self._params.remove("MapboxRoute")
 
-  def _handle_save_fav(self, key, is_fav, res, text):
+  def _handle_save_fav(self, key, res, text):
     if res == DialogResult.CONFIRM and text:
       favs = self._favs
-      (favs.setdefault("favorites", {}) if is_fav else favs)[key] = text
+      favs[key] = text
       self._params.put("MapboxFavorites", json.dumps(favs))
 
   def _open_fav_dialog(self, key, title):
-    InputDialogSP(title, current_text=self._favs.get(key, ""), callback=partial(self._handle_save_fav, key, False)).show()
+    InputDialogSP(title, current_text=self._favs.get(key, ""), callback=partial(self._handle_save_fav, key)).show()
 
   def _add_fav_name_cb(self, res, name):
     if res == DialogResult.CONFIRM and name:
-      InputDialogSP(f"Set Route for {name}", "", callback=partial(self._handle_save_fav, name, True), min_text_size=1).show()
+      InputDialogSP(f"Set Route for {name}", "", callback=partial(self._handle_save_fav, name), min_text_size=1).show()
 
   def _add_fav(self):
     InputDialogSP("Favorite Name", "", callback=self._add_fav_name_cb, min_text_size=1).show()
@@ -93,19 +93,22 @@ class NavigationLayout(Widget):
     if index < 2:
       if route := favs.get(["home", "work"][index]):
         self._params.put("MapboxRoute", route)
-    elif favorites := favs.get("favorites"):
-      self._show_list_dialog(tr("Select Favorite"), list(favorites.keys()), partial(self._set_mapbox_route_cb, favorites))
     else:
-      gui_app.set_modal_overlay(alert_dialog(tr("No custom favorites set")))
+      custom_favs = {k: v for k, v in favs.items() if k not in ("home", "work")}
+      if custom_favs:
+        self._show_list_dialog(tr("Select Favorite"), list(custom_favs.keys()), partial(self._set_mapbox_route_cb, custom_favs))
+      else:
+        gui_app.set_modal_overlay(alert_dialog(tr("No custom favorites set")))
 
   def _remove_fav_cb(self, selection):
     favs = self._favs
-    if favs.get("favorites", {}).pop(selection, None):
+    if favs.pop(selection, None):
       self._params.put("MapboxFavorites", json.dumps(favs))
 
   def _remove_fav(self):
-    if favorites := self._favs.get("favorites"):
-      self._show_list_dialog(tr("Remove Favorite"), list(favorites.keys()), self._remove_fav_cb)
+    custom_favs = {k: v for k, v in self._favs.items() if k not in ("home", "work")}
+    if custom_favs:
+      self._show_list_dialog(tr("Remove Favorite"), list(custom_favs.keys()), self._remove_fav_cb)
     else:
       gui_app.set_modal_overlay(alert_dialog(tr("No custom favorites to remove")))
 

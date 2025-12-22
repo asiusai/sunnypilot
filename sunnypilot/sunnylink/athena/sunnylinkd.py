@@ -44,6 +44,12 @@ params = Params()
 sunnylink_dongle_id = params.get("SunnylinkDongleId")
 sunnylink_api = SunnylinkApi(sunnylink_dongle_id)
 
+# Parameters that should never be remotely modified for security reasons
+BLOCKED_PARAMS = {
+  "GithubUsername",  # Could grant SSH access
+  "GithubSshKeys",   # Direct SSH key injection
+}
+
 
 def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
   cloudlog.info("sunnylinkd.handle_long_poll started")
@@ -250,6 +256,11 @@ def getParams(params_keys: list[str], compression: bool = False) -> str | dict[s
 @dispatcher.add_method
 def saveParams(params_to_update: dict[str, str], compression: bool = False) -> None:
   for key, value in params_to_update.items():
+    # disallow modifications to blocked parameters
+    if key in BLOCKED_PARAMS:
+      cloudlog.warning(f"sunnylinkd.saveParams.blocked: Attempted to modify blocked parameter '{key}'")
+      continue
+
     try:
       save_param_from_base64_encoded_string(key, value, compression)
     except Exception as e:

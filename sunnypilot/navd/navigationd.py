@@ -11,7 +11,6 @@ import cereal.messaging as messaging
 from cereal import custom
 from openpilot.common.params import Params
 from openpilot.common.realtime import Ratekeeper
-from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.navd.constants import NAV_CV
 from openpilot.sunnypilot.navd.helpers import Coordinate, parse_banner_instructions
@@ -25,7 +24,7 @@ class Navigationd:
     self.mapbox = MapboxIntegration()
     self.nav_instructions = NavigationInstructions()
 
-    self.sm = messaging.SubMaster(['carState', 'liveLocationKalman'])
+    self.sm = messaging.SubMaster(['carState', 'liveLocationKalman', 'gpsLocation'])
     self.pm = messaging.PubMaster(['navigationd'])
     self.rk = Ratekeeper(3) # 3 Hz
 
@@ -150,26 +149,27 @@ class Navigationd:
     return msg
 
   def run(self):
-    cloudlog.warning('navigationd init')
-    debug_counter = 0
-
     while True:
       self.sm.update(0)
+
+      # Try liveLocationKalman first, fall back to gpsLocation
       location = self.sm['liveLocationKalman']
       localizer_valid = location.positionGeodetic.valid if location else False
 
       if localizer_valid:
         self.last_bearing = degrees(location.calibratedOrientationNED.value[2])
         self.last_position = Coordinate(location.positionGeodetic.value[0], location.positionGeodetic.value[1])
+      else:
+        gps = self.sm['gpsLocation']
+        if gps and gps.hasFix:
+          self.last_bearing = gps.bearingDeg
+          self.last_position = Coordinate(gps.latitude, gps.longitude)
+          localizer_valid = True
 
       self._update_params()
       banner_instructions, progress, nav_data = self._update_navigation()
 
       msg = self._build_navigation_message(banner_instructions, progress, nav_data, valid=localizer_valid)
-
-      debug_counter += 1
-      if debug_counter % 30 == 0:  # Log every 10 seconds (3Hz * 30 = 90s, actually every 10s)
-        cloudlog.warning(f'NAV DEBUG: valid={self.valid} route={self.route is not None} pos={self.last_position is not None} allow={self.allow_navigation} dest={self.destination}')
 
       self.pm.send('navigationd', msg)
       self.rk.keep_time()

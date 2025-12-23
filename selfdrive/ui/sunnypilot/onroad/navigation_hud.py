@@ -78,7 +78,6 @@ class NavigationHudRenderer(Widget):
     self._font_medium = gui_app.font(FontWeight.MEDIUM)
     self._icons: dict[str, rl.Texture2D] = {}
     self._valid = False
-    self._debug_reason = ""
     self._street = ""
     self._distance = ""
     self._maneuver_type = ""
@@ -136,27 +135,19 @@ class NavigationHudRenderer(Widget):
   def _update_state(self) -> None:
     sm = ui_state.sm
     if "navigationd" not in sm.data:
-      self._debug_reason = "no navigationd in sm.data"
       self._valid = False
       return
 
     recv_frame = sm.recv_frame.get("navigationd", 0)
     if recv_frame < ui_state.started_frame:
-      self._debug_reason = f"frame: {recv_frame} < {ui_state.started_frame}"
       self._valid = False
       return
 
     nav = sm["navigationd"]
-    if not nav.valid:
-      self._debug_reason = f"nav.valid=False, maneuvers={len(nav.allManeuvers)}"
-      self._valid = False
-      return
-    if len(nav.allManeuvers) == 0:
-      self._debug_reason = "nav.valid=True but allManeuvers empty"
+    if not nav.valid or len(nav.allManeuvers) == 0:
       self._valid = False
       return
 
-    self._debug_reason = ""
     self._valid = True
 
     curr_idx = 1 if len(nav.allManeuvers) > 1 else 0
@@ -188,9 +179,6 @@ class NavigationHudRenderer(Widget):
       self._has_next = False
 
   def _render(self, rect: rl.Rectangle) -> None:
-    if self._debug_reason:
-      rl.draw_text_ex(self._font_medium, f"NAV: {self._debug_reason}", rl.Vector2(20, 100), 24, 0, rl.RED)
-
     if not self._valid:
       return
 

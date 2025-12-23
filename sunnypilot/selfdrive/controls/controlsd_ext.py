@@ -84,8 +84,6 @@ class ControlsExt(ModelStateBase):
 
     CC_SP.intelligentCruiseButtonManagement = sm['selfdriveStateSP'].intelligentCruiseButtonManagement
 
-    CC_SP.speed = sm['carState'].vEgo
-
     return CC_SP
 
   @staticmethod

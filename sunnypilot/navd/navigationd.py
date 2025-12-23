@@ -151,6 +151,7 @@ class Navigationd:
 
   def run(self):
     cloudlog.warning('navigationd init')
+    debug_counter = 0
 
     while True:
       self.sm.update(0)
@@ -165,6 +166,10 @@ class Navigationd:
       banner_instructions, progress, nav_data = self._update_navigation()
 
       msg = self._build_navigation_message(banner_instructions, progress, nav_data, valid=localizer_valid)
+
+      debug_counter += 1
+      if debug_counter % 30 == 0:  # Log every 10 seconds (3Hz * 30 = 90s, actually every 10s)
+        cloudlog.warning(f'NAV DEBUG: valid={self.valid} route={self.route is not None} pos={self.last_position is not None} allow={self.allow_navigation} dest={self.destination}')
 
       self.pm.send('navigationd', msg)
       self.rk.keep_time()

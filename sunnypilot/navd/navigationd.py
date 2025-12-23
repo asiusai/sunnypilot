@@ -11,7 +11,6 @@ import cereal.messaging as messaging
 from cereal import custom
 from openpilot.common.params import Params
 from openpilot.common.realtime import Ratekeeper
-from openpilot.common.swaglog import cloudlog
 
 from openpilot.sunnypilot.navd.constants import NAV_CV
 from openpilot.sunnypilot.navd.helpers import Coordinate, parse_banner_instructions
@@ -150,9 +149,6 @@ class Navigationd:
     return msg
 
   def run(self):
-    cloudlog.warning('navigationd init')
-    debug_counter = 0
-
     while True:
       self.sm.update(0)
       location = self.sm['liveLocationKalman']
@@ -166,10 +162,6 @@ class Navigationd:
       banner_instructions, progress, nav_data = self._update_navigation()
 
       msg = self._build_navigation_message(banner_instructions, progress, nav_data, valid=localizer_valid)
-
-      debug_counter += 1
-      if debug_counter % 30 == 0:  # Log every 10 seconds (3Hz * 30 = 90s, actually every 10s)
-        cloudlog.warning(f'NAV DEBUG: valid={self.valid} route={self.route is not None} pos={self.last_position is not None} allow={self.allow_navigation} dest={self.destination}')
 
       self.pm.send('navigationd', msg)
       self.rk.keep_time()

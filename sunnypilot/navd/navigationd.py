@@ -6,6 +6,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 from math import degrees
 from numpy import interp
+import threading
 
 import cereal.messaging as messaging
 from cereal import custom
@@ -43,6 +44,23 @@ class Navigationd:
     self.last_bearing: float | None = None
     self.valid: bool = False
 
+    self._route_thread: threading.Thread | None = None
+    self._route_lock = threading.Lock()
+    self._route_computing: bool = False
+
+  def _compute_route_async(self, destination: str, longitude: float, latitude: float, bearing: float | None):
+    postvars = {'place_name': destination}
+    postvars, valid_addr = self.mapbox.set_destination(postvars, longitude, latitude, bearing)
+
+    with self._route_lock:
+      if valid_addr:
+        self.destination = destination
+        self.nav_instructions.clear_route_cache()
+        self.route = self.nav_instructions.get_current_route()
+        self.cancel_route_counter = 0
+        self.reroute_counter = 0
+      self._route_computing = False
+
   def _update_params(self):
     if self.last_position is not None:
       self.frame += 1
@@ -53,38 +71,43 @@ class Navigationd:
 
       # Handle clearing the route when MapboxRoute is set to empty/null
       if (self.new_destination == '' or self.new_destination is None) and self.destination is not None and self.destination != '':
-        self.destination = None
-        self.nav_instructions.clear_route_cache()
-        self.route = None
-        self.cancel_route_counter = 0
-        self.reroute_counter = 0
+        with self._route_lock:
+          self.destination = None
+          self.nav_instructions.clear_route_cache()
+          self.route = None
+          self.cancel_route_counter = 0
+          self.reroute_counter = 0
 
       self.allow_recompute: bool = (self.new_destination != self.destination and self.new_destination != '') or (
         self.recompute_allowed and self.reroute_counter > 9 and self.route)
 
-      if self.allow_recompute:
-        postvars = {'place_name': self.new_destination}
-        postvars, valid_addr = self.mapbox.set_destination(postvars, self.last_position.longitude, self.last_position.latitude, self.last_bearing)
-
-        if valid_addr:
-          self.destination = self.new_destination
-          self.nav_instructions.clear_route_cache()
-          self.route = self.nav_instructions.get_current_route()
-          self.cancel_route_counter = 0
-          self.reroute_counter = 0
+      if self.allow_recompute and not self._route_computing:
+        self._route_computing = True
+        self._route_thread = threading.Thread(
+          target=self._compute_route_async,
+          args=(self.new_destination, self.last_position.longitude, self.last_position.latitude, self.last_bearing),
+          daemon=True
+        )
+        self._route_thread.start()
 
       if self.cancel_route_counter == 30:
         self.cancel_route_counter = 0
         self.params.put_nonblocking("MapboxRoute", "")
-        self.nav_instructions.clear_route_cache()
-        self.route = None
+        with self._route_lock:
+          self.nav_instructions.clear_route_cache()
+          self.route = None
 
-      self.valid = self.route is not None
+      with self._route_lock:
+        self.valid = self.route is not None
 
   def _update_navigation(self) -> tuple[str, dict | None, dict]:
     banner_instructions: str = ''
     nav_data: dict = {}
-    if self.allow_navigation and self.route and self.last_position is not None:
+
+    with self._route_lock:
+      route = self.route
+
+    if self.allow_navigation and route and self.last_position is not None:
       if progress := self.nav_instructions.get_route_progress(self.last_position.latitude, self.last_position.longitude):
         v_ego = float(max(self.sm['carState'].vEgo, 0.0))
         nav_data['upcoming_turn'] = self.nav_instructions.get_upcoming_turn_from_progress(progress, self.last_position.latitude,
@@ -102,7 +125,7 @@ class Navigationd:
         distance_list: list = [100.0, 125.0, 150.0, 200.0, 250.0]
         large_distance: bool = progress['distance_from_route'] > float(interp(v_ego, speed_breakpoints, distance_list))
 
-        route_bearing_misalign: bool = self.nav_instructions.route_bearing_misalign(self.route, self.last_bearing, v_ego)
+        route_bearing_misalign: bool = self.nav_instructions.route_bearing_misalign(route, self.last_bearing, v_ego)
 
         if large_distance and not arrived:
           self.cancel_route_counter = self.cancel_route_counter + 1 if progress['distance_from_route'] > NAV_CV.QUARTER_MILE else 0
@@ -120,7 +143,7 @@ class Navigationd:
           self.reroute_counter = 0
 
         # Don't recompute in last segment to prevent reroute loops
-        if progress['current_step_idx'] == len(self.route['steps']) - 1:
+        if progress['current_step_idx'] == len(route['steps']) - 1:
           self.recompute_allowed = False
           self.allow_navigation = False
     else:

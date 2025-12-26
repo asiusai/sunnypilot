@@ -194,7 +194,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     // Navigation params
     {"AllowNavigation", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"MapboxFavorites", {PERSISTENT | BACKUP, STRING}},
-    {"MapboxToken", {PERSISTENT | BACKUP, STRING}},
+    {"MapboxToken", {PERSISTENT | BACKUP, STRING, "pk.eyJ1IjoiY29tbWFhaSIsImEiOiJjangyYXV0c20wMGU2NDluMWR4amUydGl5In0.6Vb11S6tdX6Arpj6trRE_g"}},
     {"MapboxSettings", {CLEAR_ON_MANAGER_START, JSON}},
     {"MapboxRoute", {PERSISTENT, STRING}},
     {"MapboxRecompute", {PERSISTENT | BACKUP, BOOL, "0"}},

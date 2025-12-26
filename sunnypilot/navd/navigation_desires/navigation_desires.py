@@ -12,7 +12,7 @@ from openpilot.common.params import Params
 
 class NavigationDesires:
   def __init__(self):
-    self.sm = messaging.SubMaster(['navigationd'])
+    self.sm: messaging.SubMaster | None = None
     self.desire = log.Desire.none
     self._turn_speed_limit = 20 * CV.MPH_TO_MS
     self._params = Params()
@@ -26,10 +26,14 @@ class NavigationDesires:
 
   def update(self, CS: car.CarState, lateral_active: bool) -> log.Desire:
     self.update_params()
+    self.desire = log.Desire.none
+    if not self.nav_allowed:
+      return self.desire
+    if self.sm is None:
+      self.sm = messaging.SubMaster(['navigationd'])
     self.sm.update(0)
     nav_msg = self.sm['navigationd']
-    self.desire = log.Desire.none
-    if self.nav_allowed and nav_msg.valid and lateral_active:
+    if nav_msg.valid and lateral_active:
       upcoming = nav_msg.upcomingTurn
       if upcoming == 'slightLeft' and not CS.rightBlinker and not CS.leftBlindspot and CS.steeringPressed and CS.steeringTorque > 0:
         self.desire = log.Desire.keepLeft

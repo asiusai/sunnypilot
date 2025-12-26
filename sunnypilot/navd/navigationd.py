@@ -25,7 +25,7 @@ class Navigationd:
     self.mapbox = MapboxIntegration()
     self.nav_instructions = NavigationInstructions()
 
-    self.sm = messaging.SubMaster(['carState', 'liveLocationKalman'])
+    self.sm = messaging.SubMaster(['liveLocationKalman', 'gpsLocation'])
     self.pm = messaging.PubMaster(['navigationd'])
     self.rk = Ratekeeper(3) # 3 Hz
 
@@ -109,7 +109,7 @@ class Navigationd:
 
     if self.allow_navigation and route and self.last_position is not None:
       if progress := self.nav_instructions.get_route_progress(self.last_position.latitude, self.last_position.longitude):
-        v_ego = float(max(self.sm['carState'].vEgo, 0.0))
+        v_ego = float(max(0.0, 0.0))
         nav_data['upcoming_turn'] = self.nav_instructions.get_upcoming_turn_from_progress(progress, self.last_position.latitude,
                                                                                           self.last_position.longitude, v_ego)
         speed_limit, _ = progress['current_maxspeed']
@@ -175,18 +175,27 @@ class Navigationd:
     while True:
       self.sm.update(0)
 
+      # Try liveLocationKalman first, fall back to gpsLocation
       location = self.sm['liveLocationKalman']
       localizer_valid = location.positionGeodetic.valid if location else False
 
       if localizer_valid:
         self.last_bearing = degrees(location.calibratedOrientationNED.value[2])
         self.last_position = Coordinate(location.positionGeodetic.value[0], location.positionGeodetic.value[1])
+      else:
+        gps = self.sm['gpsLocation']
+        if gps and gps.hasFix:
+          self.last_bearing = gps.bearingDeg
+          self.last_position = Coordinate(gps.latitude, gps.longitude)
+          localizer_valid = True
 
       self._update_params()
       banner_instructions, progress, nav_data = self._update_navigation()
 
-      msg = self._build_navigation_message(banner_instructions, progress, nav_data, valid=localizer_valid)
-      self.pm.send('navigationd', msg)
+      # Only publish when we have valid location data to avoid triggering commIssue
+      if localizer_valid:
+        msg = self._build_navigation_message(banner_instructions, progress, nav_data, valid=localizer_valid)
+        self.pm.send('navigationd', msg)
 
       self.rk.keep_time()
 

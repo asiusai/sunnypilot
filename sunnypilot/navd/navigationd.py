@@ -4,7 +4,7 @@ Copyright (c) 2021-, James Vecellio, Haibin Wen, sunnypilot, and a number of oth
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-from math import degrees
+from math import degrees, sqrt
 from numpy import interp
 import threading
 
@@ -42,6 +42,7 @@ class Navigationd:
     self.frame: int = -1
     self.last_position: Coordinate | None = None
     self.last_bearing: float | None = None
+    self.last_speed: float = 0.0
     self.valid: bool = False
 
     self._route_thread: threading.Thread | None = None
@@ -109,7 +110,7 @@ class Navigationd:
 
     if self.allow_navigation and route and self.last_position is not None:
       if progress := self.nav_instructions.get_route_progress(self.last_position.latitude, self.last_position.longitude):
-        v_ego = float(max(0.0, 0.0))
+        v_ego = self.last_speed
         nav_data['upcoming_turn'] = self.nav_instructions.get_upcoming_turn_from_progress(progress, self.last_position.latitude,
                                                                                           self.last_position.longitude, v_ego)
         speed_limit, _ = progress['current_maxspeed']
@@ -182,11 +183,14 @@ class Navigationd:
       if localizer_valid:
         self.last_bearing = degrees(location.calibratedOrientationNED.value[2])
         self.last_position = Coordinate(location.positionGeodetic.value[0], location.positionGeodetic.value[1])
+        vel = location.velocityCalibrated.value
+        self.last_speed = sqrt(vel[0]**2 + vel[1]**2 + vel[2]**2)
       else:
         gps = self.sm['gpsLocation']
         if gps and gps.hasFix:
           self.last_bearing = gps.bearingDeg
           self.last_position = Coordinate(gps.latitude, gps.longitude)
+          self.last_speed = gps.speed
           localizer_valid = True
 
       self._update_params()

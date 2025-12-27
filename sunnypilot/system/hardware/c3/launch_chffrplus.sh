@@ -17,6 +17,10 @@ function agnos_init {
   sudo chgrp gpu /dev/adsprpc-smd /dev/ion /dev/kgsl-3d0
   sudo chmod 660 /dev/adsprpc-smd /dev/ion /dev/kgsl-3d0
 
+  # Attach Bluetooth UART if available
+  if [ -e /dev/ttyHS0 ] && ! pgrep -x btattach > /dev/null; then
+    sudo btattach -B /dev/ttyHS0 -S 115200 &
+  fi
 
   if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
     AGNOS_PY="$DIR/system/hardware/tici/agnos.py"

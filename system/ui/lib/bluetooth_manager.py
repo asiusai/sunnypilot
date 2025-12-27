@@ -325,7 +325,7 @@ class BluetoothManager:
 
         # Trust the device first
         props = Properties(dev_addr)
-        self._router_main.send_and_get_reply(props.set("Trusted", ("b", True)))
+        self._router_main.send_and_get_reply(props.set(BLUEZ_DEVICE_IFACE, "Trusted", ("b", True)))
 
         # Pair
         reply = self._router_main.send_and_get_reply(new_method_call(dev_addr, "Pair"))

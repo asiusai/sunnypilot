@@ -15,12 +15,12 @@ ITEM_HEIGHT = 160
 ICON_SIZE = 50
 
 DEVICE_TYPE_ICONS = {
-  DeviceType.CONTROLLER: "icons/controller.png",
-  DeviceType.AUDIO: "icons/speaker.png",
-  DeviceType.KEYBOARD: "icons/keyboard.png",
-  DeviceType.MOUSE: "icons/mouse.png",
-  DeviceType.OTHER: "icons/bluetooth.png",
-  DeviceType.UNKNOWN: "icons/bluetooth.png",
+  DeviceType.CONTROLLER: "icons/chffr_wheel.png",
+  DeviceType.AUDIO: "icons/microphone.png",
+  DeviceType.KEYBOARD: "icons/menu.png",
+  DeviceType.MOUSE: "icons/menu.png",
+  DeviceType.OTHER: "icons/link.png",
+  DeviceType.UNKNOWN: "icons/link.png",
 }
 
 
@@ -66,7 +66,7 @@ class BluetoothUI(Widget):
     self._bt_manager.stop_scan()
 
   def _load_icons(self):
-    for icon in list(DEVICE_TYPE_ICONS.values()) + ["icons/checkmark.png", "icons/bluetooth.png"]:
+    for icon in list(DEVICE_TYPE_ICONS.values()) + ["icons/checkmark.png"]:
       gui_app.texture(icon, ICON_SIZE, ICON_SIZE)
 
   def _update_state(self):
@@ -171,7 +171,7 @@ class BluetoothUI(Widget):
           self._action_buttons[device.address].render(forget_btn_rect)
 
     # Draw device type icon
-    icon_file = DEVICE_TYPE_ICONS.get(device.device_type, "icons/bluetooth.png")
+    icon_file = DEVICE_TYPE_ICONS.get(device.device_type, "icons/link.png")
     texture = gui_app.texture(icon_file, ICON_SIZE, ICON_SIZE)
     rl.draw_texture_v(texture, rl.Vector2(type_icon_rect.x, type_icon_rect.y), rl.WHITE)
 

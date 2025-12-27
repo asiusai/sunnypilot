@@ -2,6 +2,7 @@
 import os
 import argparse
 import threading
+import time
 import numpy as np
 from inputs import UnpluggedError, get_gamepad
 
@@ -12,6 +13,12 @@ from openpilot.system.hardware import HARDWARE
 from openpilot.tools.lib.kbhit import KBHit
 
 EXPO = 0.4
+
+try:
+  from openpilot.tools.joystick import Gamepad
+  GAMEPAD_AVAILABLE = True
+except ImportError:
+  GAMEPAD_AVAILABLE = False
 
 
 class Keyboard:
@@ -91,6 +98,88 @@ class Joystick:
     return True
 
 
+class BluetoothGamepad:
+  """Bluetooth gamepad support using PiBorg Gamepad library (for PS4/PS5 controllers via Bluetooth)"""
+  def __init__(self):
+    if not GAMEPAD_AVAILABLE:
+      raise ImportError("Gamepad library not available. Run: cd /data/openpilot/tools/joystick && git clone https://github.com/piborg/Gamepad && cp Gamepad/Gamepad.py . && cp Gamepad/Controllers.py .")
+
+    self.gamepad = None
+    self._connect()
+    self.speed_scale = [0.33, 0.66, 1.0]
+    self.speed_mode = 1
+    self.axes_values = {'accel': 0., 'steer': 0.}
+    self.axes_order = ['accel', 'steer']
+    self.cancel = False
+    self._dpad_pressed = False
+
+  def _connect(self):
+    if not Gamepad.available():
+      print('Waiting for Bluetooth gamepad connection...')
+      print('Make sure you have run: sudo hciattach /dev/ttyHS1 any 115200 flow')
+      print('And paired your controller via bluetoothctl')
+      while not Gamepad.available():
+        time.sleep(1.0)
+    # DualSense over Bluetooth has different axis mapping than PS4
+    # Axis 0: LEFT-X, 1: LEFT-Y, 2: RIGHT-X, 3: L2, 4: R2, 5: RIGHT-Y
+    self.gamepad = Gamepad.PS4()
+    # Override axis names for DualSense Bluetooth mapping
+    self.gamepad.axisNames = {
+      0: 'LEFT-X',
+      1: 'LEFT-Y',
+      2: 'RIGHT-X',
+      3: 'L2',
+      4: 'R2',
+      5: 'RIGHT-Y',
+      6: 'DPAD-X',
+      7: 'DPAD-Y'
+    }
+    self.gamepad._setupReverseMaps()
+    self.gamepad.startBackgroundUpdates()
+    print('Bluetooth gamepad connected!')
+
+  def update(self):
+    if not self.gamepad.isConnected():
+      print('Gamepad disconnected, attempting to reconnect...')
+      self._connect()
+      return False
+
+    # Left stick X for steering (full range -1 to 1)
+    steer = self.gamepad.axis('LEFT-X')
+    self.axes_values['steer'] = -steer  # negative because left should be negative
+
+    # L2 for braking, R2 for acceleration
+    # Triggers go from -1 (released) to 1 (fully pressed)
+    r2 = self.gamepad.axis('R2')  # acceleration
+    l2 = self.gamepad.axis('L2')  # brake
+
+    # Convert from [-1, 1] to [0, 1]
+    accel_amount = (r2 + 1.0) / 2.0
+    brake_amount = (l2 + 1.0) / 2.0
+
+    # accel positive = accelerate, negative = brake
+    self.axes_values['accel'] = self.speed_scale[self.speed_mode] * (accel_amount - brake_amount)
+
+    # D-pad for speed mode
+    dpad_y = self.gamepad.axis('DPAD-Y')
+    if abs(dpad_y) > 0.5:
+      if not self._dpad_pressed:
+        self._dpad_pressed = True
+        if dpad_y < 0 and self.speed_mode < 2:
+          self.speed_mode += 1
+          print(f'Speed mode: {self.speed_mode + 1}/3')
+        elif dpad_y > 0 and self.speed_mode > 0:
+          self.speed_mode -= 1
+          print(f'Speed mode: {self.speed_mode + 1}/3')
+    else:
+      self._dpad_pressed = False
+
+    # Triangle button for cancel
+    self.cancel = self.gamepad.isPressed('TRIANGLE')
+
+    return True
+
+
 def send_thread(joystick):
   pm = messaging.PubMaster(['testJoystick'])
 
@@ -123,9 +212,10 @@ def main():
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Publishes events from your joystick to control your car.\n' +
                                                'openpilot must be offroad before starting joystick_control. This tool supports ' +
-                                               'a PlayStation 5 DualSense controller on the comma 3X.',
+                                               'USB joysticks, Bluetooth gamepads (PS4/PS5), and keyboard input.',
                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
   parser.add_argument('--keyboard', action='store_true', help='Use your keyboard instead of a joystick')
+  parser.add_argument('--bluetooth', action='store_true', help='Use Bluetooth gamepad (PS4/PS5 controller)')
   args = parser.parse_args()
 
   if not Params().get_bool("IsOffroad") and "ZMQ" not in os.environ:
@@ -139,9 +229,22 @@ if __name__ == '__main__':
     print('Buttons')
     print('- `R`: Resets axes')
     print('- `C`: Cancel cruise control')
+    joystick = Keyboard()
+  elif args.bluetooth:
+    print('Using Bluetooth gamepad (PS4/PS5 controller)')
+    print('Gas control: R2 trigger')
+    print('Brake control: L2 trigger')
+    print('Steering control: Left joystick')
+    print('Speed modes: D-pad Up/Down')
+    print('Cancel: Triangle button')
+    print()
+    print('Before running, make sure to:')
+    print('1. sudo hciattach /dev/ttyHS1 any 115200 flow')
+    print('2. Pair controller via bluetoothctl')
+    joystick = BluetoothGamepad()
   else:
-    print('Using joystick, make sure to run cereal/messaging/bridge on your device if running over the network!')
+    print('Using USB joystick, make sure to run cereal/messaging/bridge on your device if running over the network!')
     print('If not running on a comma device, the mapping may need to be adjusted.')
+    joystick = Joystick()
 
-  joystick = Keyboard() if args.keyboard else Joystick()
   joystick_control_thread(joystick)

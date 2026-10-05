@@ -183,11 +183,7 @@ class SunnylinkState:
         time.sleep(self.SLEEP_INTERVAL)
 
   def start(self) -> None:
-    if self._thread and self._thread.is_alive():
-      return
-    self._running = True
-    self._thread = threading.Thread(target=self._worker_thread, daemon=True)
-    self._thread.start()
+    pass
 
   def stop(self) -> None:
     self._running = False

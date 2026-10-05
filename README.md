@@ -1,5 +1,13 @@
 ![](https://user-images.githubusercontent.com/47793918/233812617-beab2e71-57b9-479e-8bff-c3931347ca40.png)
 
+## Asius fork
+
+This fork adds Asius hardware support and [Asius App](https://app.asius.ai) access.
+It keeps sunnypilot driving features, model downloads and map downloads.
+Comma registration, Athena, sunnylink, remote backups, statistics, crash uploads and copyparty are disabled in code.
+Asius devices pair over Bluetooth. Comma devices show an Asius pairing QR code.
+Source revisions are recorded in [asius-sources.json](asius-sources.json).
+
 ## 🌞 What is sunnypilot?
 [sunnypilot](https://github.com/sunnyhaibin/sunnypilot) is a fork of comma.ai's openpilot, an open source driver assistance system. sunnypilot offers the user a unique driving experience for over 300+ supported car makes and models with modified behaviors of driving assist engagements. sunnypilot complies with comma.ai's safety rules as accurately as possible.
 
@@ -14,7 +22,8 @@ https://docs.sunnypilot.ai/ is your one stop shop for everything from features t
 First, check out this list of items you'll need to [get started](https://community.sunnypilot.ai/t/getting-started-using-sunnypilot-in-your-supported-car/251).
 
 ## Installation
-Next, refer to the sunnypilot community forum for [installation instructions](https://community.sunnypilot.ai/t/read-before-installing-sunnypilot/254), as well as a complete list of [Recommended Branch Installations](https://community.sunnypilot.ai/t/recommended-branch-installations/235).
+Use `asiusai/sunnypilot:master` for this fork. Updates stay on that source.
+The `upstream` branch records unmodified sunnypilot source. Do not install it for Asius app access.
 
 ## 🎆 Pull Requests
 We welcome both pull requests and issues on GitHub. Bug fixes are encouraged.
@@ -23,14 +32,13 @@ Pull requests should be against the most current `master` branch.
 
 ## 📊 User Data
 
-By default, sunnypilot uploads the driving data to comma servers. You can also access your data through [comma connect](https://connect.comma.ai/).
-
-sunnypilot is open source software. The user is free to disable data collection if they wish to do so.
+Asius cloud uploads are encrypted. The app controls uploads and access.
+Data sharing for product improvement is off by default. Comma and sunnylink receive no driving data from this fork.
 
 sunnypilot logs the road-facing camera, CAN, GPS, IMU, magnetometer, thermal sensors, crashes, and operating system logs.
 The driver-facing camera and microphone are only logged if you explicitly opt-in in settings.
 
-By using this software, you understand that use of this software or its related services will generate certain types of user data, which may be logged and stored at the sole discretion of comma. By accepting this agreement, you grant an irrevocable, perpetual, worldwide right to comma for the use of this data.
+Local logs and crash diagnostics remain available on the device.
 
 ## Licensing
 

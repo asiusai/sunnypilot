@@ -10,7 +10,7 @@ from openpilot.selfdrive.modeld.constants import ModelConstants
 from openpilot.selfdrive.modeld.helpers import TG_INPUT_DEVICES_PATH, chestnut_present, modeld_pkl_path
 
 
-Import('env', 'arch')
+Import('env', 'arch', 'ASIUS_HARDWARE')
 chunker_file = File("#openpilot/common/file_chunker.py")
 lenv = env.Clone()
 
@@ -23,9 +23,9 @@ def estimate_pickle_max_size(onnx_size):
   # the ONNX size. Overestimating only adds an empty trailing chunk.
   return 2.0 * onnx_size + 10 * 1024 * 1024
 
-if arch == 'comma_arm64':
+if arch == 'comma_arm64' or ASIUS_HARDWARE:
   from openpilot.common.hardware import HARDWARE
-  camera = _os_fisheye if HARDWARE.get_device_type() == "mici" else _ar_ox_fisheye
+  camera = _os_fisheye if HARDWARE.get_device_type() in ("mici", "v0") else _ar_ox_fisheye
   camera_configs = [(camera.width, camera.height)]
   tg_backend = 'QCOM'
   tg_flags = f'DEV={tg_backend} IMAGE=1 FLOAT16=1 NOLOCALS=1 JIT_BATCH_SIZE=0 OPENPILOT_HACKS=1'
@@ -33,6 +33,9 @@ else:
   camera_configs = [(c.width, c.height) for c in (_ar_ox_fisheye, _os_fisheye)]
   tg_backend = 'CPU'
   tg_flags = f'DEV=CPU' if arch == 'Darwin' else 'DEV=CPU:LLVM'
+
+if ASIUS_HARDWARE:
+  tg_flags = tg_flags.replace(' NOLOCALS=1', '')
 
 tg_devices = { # which device to put jit inputs to at runtime
   'openpilot.selfdrive.modeld.dmonitoringmodeld': {

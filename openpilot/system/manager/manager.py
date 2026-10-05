@@ -16,7 +16,8 @@ from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.manager.helpers import unblock_stdout, save_bootlog
 from openpilot.system.manager.process import ensure_running
 from openpilot.system.manager.process_config import managed_processes
-from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_ID
+from openpilot.system.asius.migrate_params import migrate_cloud_params
+from openpilot.system.asius.registration import register, UNREGISTERED_DONGLE_ID
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
@@ -30,6 +31,7 @@ def manager_init() -> None:
   build_metadata = get_build_metadata()
 
   params = Params()
+  migrate_cloud_params(params)
   params.clear_all(ParamKeyFlag.CLEAR_ON_MANAGER_START)
   params.clear_all(ParamKeyFlag.CLEAR_ON_ONROAD_TRANSITION)
   params.clear_all(ParamKeyFlag.CLEAR_ON_OFFROAD_TRANSITION)
@@ -58,6 +60,9 @@ def manager_init() -> None:
     default_value = params.get_default_value(k)
     if default_value is not None and params.get(k) is None:
       params.put(k, default_value, block=True)
+
+  for key in ("SunnylinkEnabled", "EnableSunnylinkUploader", "EnableCopyparty", "EnableGithubRunner"):
+    params.put_bool(key, False, block=True)
 
   # Create folders needed for msgq
   try:

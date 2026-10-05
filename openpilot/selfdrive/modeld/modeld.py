@@ -20,6 +20,7 @@ from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
+from openpilot.common.hardware import ASIUS_HARDWARE
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import config_realtime_process, DT_MDL
 from openpilot.common.transformations.camera import DEVICE_CAMERAS
@@ -242,7 +243,7 @@ class ModelState(ModelStateBase):
 def main(demo=False):
   cloudlog.warning("modeld init")
 
-  chestnut_available = chestnut_present() and chestnut_compiled()
+  chestnut_available = chestnut_present(timeout=45. if ASIUS_HARDWARE else 0.) and chestnut_compiled()
   CHESTNUT = False
   if chestnut_available:
     poller = messaging.Poller()

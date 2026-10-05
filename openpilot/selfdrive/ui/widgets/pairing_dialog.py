@@ -1,7 +1,7 @@
 import pyray as rl
 import time
 
-from openpilot.common.api import Api
+from openpilot.system.asius.relayd import pairing_url
 from openpilot.common.qrcode import make_texture
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
@@ -11,7 +11,6 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.wrap_text import wrap_text
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets.button import IconButton
-from openpilot.selfdrive.ui.ui_state import ui_state
 
 
 class PairingDialog(Widget):
@@ -22,6 +21,7 @@ class PairingDialog(Widget):
   def __init__(self):
     super().__init__()
     self.params = Params()
+    self._initial_peers = set(self.params.get("AppAuthorizedKeys") or {})
     self.qr_texture: rl.Texture | None = None
     self.last_qr_generation = float('-inf')
     self._close_btn = IconButton(gui_app.texture("icons/close.png", 80, 80))
@@ -30,11 +30,10 @@ class PairingDialog(Widget):
   def _get_pairing_url(self) -> str:
     try:
       dongle_id = self.params.get("DongleId") or ""
-      token = Api(dongle_id).get_token({'pair': True})
+      return pairing_url(dongle_id)
     except Exception:
       cloudlog.exception("Failed to get pairing token")
-      token = ""
-    return f"https://connect.comma.ai/?pair={token}"
+      return ""
 
   def _generate_qr_code(self) -> None:
     try:
@@ -52,7 +51,7 @@ class PairingDialog(Widget):
       self.last_qr_generation = current_time
 
   def _update_state(self):
-    if ui_state.prime_state.is_paired():
+    if bool(set(self.params.get("AppAuthorizedKeys") or {}) - self._initial_peers):
       gui_app.pop_widget()
 
   def _render(self, rect: rl.Rectangle) -> int:
@@ -73,7 +72,7 @@ class PairingDialog(Widget):
     y += close_size + 40
 
     # Title
-    title = tr("Pair your device to your comma account")
+    title = tr("Pair your device with Asius App")
     title_font = gui_app.font(FontWeight.NORMAL)
     left_width = int(content_rect.width * 0.5 - 15)
 
@@ -98,9 +97,9 @@ class PairingDialog(Widget):
 
   def _render_instructions(self, rect: rl.Rectangle) -> None:
     instructions = [
-      tr("Go to https://connect.comma.ai on your phone"),
+      tr("Go to https://app.asius.ai on your phone"),
       tr("Click \"add new device\" and scan the QR code on the right"),
-      tr("Bookmark connect.comma.ai to your home screen to use it like an app"),
+      tr("Bookmark app.asius.ai to your home screen to use it like an app"),
     ]
 
     font = gui_app.font(FontWeight.BOLD)

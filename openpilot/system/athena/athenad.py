@@ -28,18 +28,16 @@ from collections.abc import Callable, Iterable
 
 import requests
 from requests.adapters import HTTPAdapter, DEFAULT_POOLBLOCK
-from websocket import (ABNF, WebSocket, WebSocketException, WebSocketTimeoutException,
-                       create_connection)
+from websocket import (ABNF, WebSocket, WebSocketTimeoutException)
 
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log
 from opendbc.car.structs import car
 from openpilot.cereal.services import SERVICE_LIST
-from openpilot.common.api import Api, get_key_pair
+from openpilot.common.api import get_key_pair
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.utils import CallbackReader, get_upload_stream
 from openpilot.common.params import Params
-from openpilot.common.realtime import set_core_affinity
 from openpilot.common.hardware import HARDWARE, PC
 from openpilot.system.loggerd.config import CAMERA_FPS, SEGMENT_LENGTH
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
@@ -65,6 +63,7 @@ WS_FRAME_SIZE = 4096
 DEVICE_STATE_UPDATE_INTERVAL = 1.0  # in seconds
 DEFAULT_UPLOAD_PRIORITY = 99  # higher number = lower priority
 CLIP_CHUNK_SIZE = 512 * 1024
+CLIP_CAMERAS = {"fcamera.mp4", "ecamera.mp4", "dcamera.mp4"}
 
 SEND_PRIORITY_HIGH = 0
 SEND_PRIORITY_LOW = 1
@@ -446,7 +445,7 @@ class VideoClips:
     self.lock = threading.Condition()
     self.clips: dict[str, VideoClips.Clip] = {}
     self.transcode_proc: tuple[str, subprocess.Popen] | None = None
-    threading.Thread(target=self._worker, name="video_clip", daemon=True).start()
+    self.worker_started = False
 
   def _encode(self, clip: Clip, inputs: Iterable[str], output_path: str, start_time: float, duration: float) -> None:
     inputs = list(inputs)
@@ -478,7 +477,8 @@ class VideoClips:
         process.stdin.write("ffconcat version 1.0\n")
         for path in inputs:
           escaped_path = path.replace("'", "'\\''")
-          process.stdin.write(f"file 'file:{escaped_path}'\noption framerate {CAMERA_FPS}\nduration {SEGMENT_LENGTH}\n")
+          framerate = f"option framerate {CAMERA_FPS}\n" if clip.camera.endswith(".hevc") else ""
+          process.stdin.write(f"file 'file:{escaped_path}'\n{framerate}duration {SEGMENT_LENGTH}\n")
         process.stdin.close()
       process.wait()
       if process.returncode != 0:
@@ -566,7 +566,7 @@ class VideoClips:
             continue
           with os.scandir(entry.path) as files:
             for camera in files:
-              if camera.is_file() and camera.name.endswith("camera.hevc"):
+              if camera.is_file() and camera.name in CLIP_CAMERAS:
                 cameras.setdefault(camera.name, []).append(int(segment))
     except OSError:
       return {}
@@ -590,9 +590,12 @@ class VideoClips:
     route_name = route_match.group("log_id")
     camera = clip["camera"]
     filename = clip["filename"]
-    assert camera == os.path.basename(camera) and camera.endswith("camera.hevc"), "invalid camera filename"
+    assert camera == os.path.basename(camera) and camera in CLIP_CAMERAS, "invalid camera filename"
     assert filename == os.path.basename(filename), "invalid filename"
     with self.lock:
+      if not self.worker_started:
+        threading.Thread(target=self._worker, name="video_clip", daemon=True).start()
+        self.worker_started = True
       self.clips[filename] = self.Clip(route_name, camera, source_start_time, source_end_time, clip["bitrate"], clip["speedup"],
                                         filename, datetime.now().timestamp())
       self.lock.notify()
@@ -737,12 +740,7 @@ def setRouteViewed(route: str) -> dict[str, int | str]:
 
 
 def startLocalProxy(global_end_event: threading.Event, remote_ws_uri: str, local_port: int) -> dict[str, int]:
-  cloudlog.debug("athena.startLocalProxy.starting")
-  dongle_id = Params().get("DongleId")
-  identity_token = Api(dongle_id).get_token()
-  ws = create_connection(remote_ws_uri, cookie="jwt=" + identity_token, enable_multithread=True)
-
-  return start_local_proxy_shim(global_end_event, local_port, ws)
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 def start_local_proxy_shim(global_end_event: threading.Event, local_port: int, ws: WebSocket) -> dict[str, int]:
@@ -822,30 +820,22 @@ def getNetworkMetered() -> bool:
 
 
 @dispatcher.add_method
-def startStream(sdp: str, enabled: bool) -> dict:
+def startStream(sdp: str, enabled: bool, inCar: bool = False) -> dict:
   from openpilot.system.webrtc.helpers import StreamRequestBody, post_stream_request, wait_for_webrtcd
   params = Params()
   bridge_services_in = []
 
-  # stale car params case taken care of by webrtcd being shut off on ignition
   cp_bytes = params.get("CarParamsPersistent")
   if cp_bytes is not None:
     with car.CarParams.from_bytes(cp_bytes) as CP:
-      if CP.notCar:
+      if CP.notCar and not inCar:
         bridge_services_in.append("testJoystick")
 
-  if params.get_bool("IsOffroad"):
-    # manager owns camerad/stream_encoderd/webrtcd; flip the param and let it bring them up.
-    # webrtcd clears IsLiveStreaming when the session ends
-    params.put_bool("IsLiveStreaming", True)
-    # wait for webrtcd end points to wake up
-    try:
-      wait_for_webrtcd()
-    except TimeoutError:
-      cloudlog.event("athena.startStream.webrtcd_offroad_start_timeout", error=True)
-      raise
+  # webrtcd owns the streaming lifetime, including ignition transitions.
+  wait_for_webrtcd()
 
-  return post_stream_request(StreamRequestBody(sdp, ["wideRoad"], enabled, bridge_services_in, ["carState", "deviceState"]))
+  return post_stream_request(StreamRequestBody(sdp, ["wideRoad"], enabled, bridge_services_in,
+                                             [] if inCar else ["carState", "deviceState", "drivingModelData", "extrinsicsCalibration"], in_car=inCar))
 
 
 def get_logs_to_send_sorted(log_attr_name=LOG_ATTR_NAME) -> list[str]:
@@ -1142,52 +1132,7 @@ def backoff(retries: int) -> int:
 
 
 def main(exit_event: threading.Event | None = None):
-  try:
-    set_core_affinity([0, 1, 2, 3])
-  except Exception:
-    cloudlog.exception("failed to set core affinity")
-
-  params = Params()
-  dongle_id = params.get("DongleId")
-  UploadQueueCache.initialize(upload_queue)
-
-  ws_uri = ATHENA_HOST + "/ws/v2/" + dongle_id
-  api = Api(dongle_id)
-
-  conn_start = None
-  conn_retries = 0
-  while exit_event is None or not exit_event.is_set():
-    try:
-      if conn_start is None:
-        conn_start = time.monotonic()
-
-      cloudlog.event("athenad.main.connecting_ws", ws_uri=ws_uri, retries=conn_retries)
-      ws = create_connection(ws_uri,
-                             cookie="jwt=" + api.get_token(),
-                             enable_multithread=True,
-                             timeout=30.0)
-      cloudlog.event("athenad.main.connected_ws", ws_uri=ws_uri, retries=conn_retries,
-                     duration=time.monotonic() - conn_start)
-      conn_start = None
-
-      conn_retries = 0
-      cur_upload_items.clear()
-
-      handle_long_poll(ws, exit_event)
-
-      ws.close()
-    except (KeyboardInterrupt, SystemExit):
-      break
-    except (ConnectionError, TimeoutError, WebSocketException):
-      conn_retries += 1
-      params.remove("LastAthenaPingTime")
-    except Exception:
-      cloudlog.exception("athenad.main.exception")
-
-      conn_retries += 1
-      params.remove("LastAthenaPingTime")
-
-    time.sleep(backoff(conn_retries))
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 if __name__ == "__main__":

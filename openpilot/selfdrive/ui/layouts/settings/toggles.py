@@ -31,8 +31,12 @@ DESCRIPTIONS = {
     "Receive alerts to steer back into the lane when your vehicle drifts over a detected lane line " +
     "without a turn signal activated while driving over 31 mph (50 km/h)."
   ),
-  "AlwaysOnDM": tr_noop("Enable driver monitoring even when sunnypilot is not engaged."),
-  'RecordFront': tr_noop("Upload data from the driver facing camera and help improve the driver monitoring algorithm."),
+  "AlwaysOnDM": tr_noop("Enable driver monitoring even when openpilot is not engaged."),
+  'RecordFront': tr_noop("Upload data from the cabin camera and help improve the driver monitoring algorithm."),
+  "ShareDrivingData": tr_noop(
+    "Allow Asius to decrypt uploaded routes for product improvement and future model training. " +
+    "When disabled, Asius cannot decrypt your data and unpreserved routes are deleted after 30 days."
+  ),
   "IsMetric": tr_noop("Display speed in km/h instead of mph."),
   "RecordAudio": tr_noop("Record and store microphone audio while driving. The audio will be included in the dashcam video in comma connect."),
 }
@@ -87,6 +91,12 @@ class TogglesLayout(Widget):
         DESCRIPTIONS["RecordAudio"],
         "microphone.png",
         True,
+      ),
+      "ShareDrivingData": (
+        lambda: tr("Share Driving Data with Asius"),
+        DESCRIPTIONS["ShareDrivingData"],
+        "network.png",
+        False,
       ),
       "IsMetric": (
         lambda: tr("Use Metric System"),

@@ -1,6 +1,5 @@
 import pyray as rl
 from openpilot.common.time_helpers import system_time_valid
-from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.widgets.pairing_dialog import PairingDialog
 from openpilot.system.ui.lib.application import gui_app, FontWeight, FONT_SCALE
 from openpilot.system.ui.lib.multilang import tr
@@ -25,10 +24,7 @@ class SetupWidget(Widget):
     self._open_settings_callback = callback
 
   def _render(self, rect: rl.Rectangle):
-    if not ui_state.prime_state.is_paired():
-      self._render_registration(rect)
-    else:
-      self._render_firehose_prompt(rect)
+    self._render_registration(rect)
 
   def _render_registration(self, rect: rl.Rectangle):
     """Render registration prompt."""
@@ -41,11 +37,11 @@ class SetupWidget(Widget):
 
     # Title
     font = gui_app.font(FontWeight.BOLD)
-    rl.draw_text_ex(font, tr("Finish Setup"), rl.Vector2(x, y), 75, 0, rl.WHITE)
+    rl.draw_text_ex(font, tr("Asius App"), rl.Vector2(x, y), 75, 0, rl.WHITE)
     y += 113  # 75 + 38 spacing
 
     # Description
-    desc = tr("Pair your device with comma connect (connect.comma.ai) and claim your comma prime offer.")
+    desc = tr("Pair your device with Asius App (app.asius.ai).")
     light_font = gui_app.font(FontWeight.NORMAL)
     wrapped = wrap_text(light_font, desc, 50, int(w))
     for line in wrapped:

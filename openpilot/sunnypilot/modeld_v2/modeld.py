@@ -16,7 +16,7 @@ from setproctitle import setproctitle
 from tinygrad.tensor import Tensor
 
 import openpilot.cereal.messaging as messaging
-from openpilot.common.hardware import COMMA_HARDWARE
+from openpilot.common.hardware import COMMA_HARDWARE, ASIUS_HARDWARE
 from openpilot.selfdrive.modeld.helpers import chestnut_present
 from openpilot.cereal import log
 from opendbc.car.structs import car
@@ -120,8 +120,8 @@ class ModelState(ModelStateBase):
     jits = load_oob(open_file_chunked(pkl_path))
 
     metadata = jits['metadata']
-    self.WARP_DEV = metadata.get('warp_dev', 'QCOM') if COMMA_HARDWARE else 'CPU'
-    self.DEV = ('AMD' if self.chestnut else 'QCOM') if COMMA_HARDWARE else 'CPU'
+    self.WARP_DEV = metadata.get('warp_dev', 'QCOM') if COMMA_HARDWARE or ASIUS_HARDWARE else 'CPU'
+    self.DEV = ('AMD' if self.chestnut else 'QCOM') if COMMA_HARDWARE or ASIUS_HARDWARE else 'CPU'
     self.QUEUE_DEV = self.DEV
     self.is_run_model = 'run_model' in jits
 

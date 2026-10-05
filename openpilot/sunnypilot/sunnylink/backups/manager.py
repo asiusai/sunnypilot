@@ -278,8 +278,7 @@ class BackupManagerSP:
 
 
 def main():
-  import asyncio
-  asyncio.run(BackupManagerSP().main_thread())
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 if __name__ == "__main__":

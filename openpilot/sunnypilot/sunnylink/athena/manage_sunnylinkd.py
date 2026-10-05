@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-from openpilot.system.athena.manage_athenad import manage_athenad
+"""sunnylink remote access is disabled in the Asius fork."""
+
+
+def main():
+  raise RuntimeError("sunnylink is disabled in the Asius fork.")
+
 
 if __name__ == '__main__':
-  manage_athenad("SunnylinkDongleId", "SunnylinkdPid", 'sunnylinkd', 'openpilot.sunnypilot.sunnylink.athena.sunnylinkd')
+  main()

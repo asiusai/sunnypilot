@@ -12,13 +12,9 @@ from openpilot.common.version import get_build_metadata
 ATHENA_MGR_PID_PARAM = "AthenadPid"
 
 
-def main():
-  manage_athenad("DongleId", ATHENA_MGR_PID_PARAM, 'athenad', 'openpilot.system.athena.athenad')
-
-
-def manage_athenad(dongle_id_param, pid_param, process_name, target):
+def manage(module: str, process_name: str, pid_param: str) -> None:
   params = Params()
-  dongle_id = params.get(dongle_id_param)
+  dongle_id = params.get("DongleId")
   build_metadata = get_build_metadata()
 
   cloudlog.bind_global(dongle_id=dongle_id,
@@ -31,8 +27,8 @@ def manage_athenad(dongle_id_param, pid_param, process_name, target):
 
   try:
     while 1:
-      cloudlog.info(f"starting {process_name} daemon")
-      proc = Process(name=process_name, target=launcher, args=(target, process_name))
+      cloudlog.info(f"starting {process_name}")
+      proc = Process(name=process_name, target=launcher, args=(module, process_name))
       proc.start()
       proc.join()
       cloudlog.event(f"{process_name} exited", exitcode=proc.exitcode)
@@ -41,6 +37,11 @@ def manage_athenad(dongle_id_param, pid_param, process_name, target):
     cloudlog.exception(f"manage_{process_name}.exception")
   finally:
     params.remove(pid_param)
+
+
+def main():
+  raise RuntimeError("This service is disabled in the Asius fork.")
+
 
 if __name__ == '__main__':
   main()

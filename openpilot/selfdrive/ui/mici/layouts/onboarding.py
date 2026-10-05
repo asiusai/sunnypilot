@@ -328,9 +328,7 @@ class OnboardingWindow(Widget):
     self._accepted_terms: bool = (ui_state.params.get("HasAcceptedTerms") == terms_version and
                                   ui_state.params.get("HasAcceptedTermsSP") == terms_version_sp)
     self._training_done: bool = ui_state.params.get("CompletedTrainingVersion") == training_version
-    self._sunnylink_consent_done: bool = ui_state.params.get("CompletedSunnylinkConsentVersion") in {
-      sunnylink_consent_version, sunnylink_consent_declined
-    }
+    self._sunnylink_consent_done: bool = True
 
     self.set_rect(rl.Rectangle(0, 0, gui_app.width, gui_app.height))
 

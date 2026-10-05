@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import json
 import os
-import random
 import requests
 import threading
 import time
@@ -10,12 +9,9 @@ import datetime
 from collections.abc import Iterator
 
 from openpilot.cereal import log
-import openpilot.cereal.messaging as messaging
 from openpilot.common.api import Api
 from openpilot.common.utils import get_upload_stream
 from openpilot.common.params import Params
-from openpilot.common.realtime import set_core_affinity
-from openpilot.common.hardware.hw import Paths
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
 from openpilot.common.swaglog import cloudlog
 
@@ -72,6 +68,11 @@ def clear_locks(root: str) -> None:
 
 
 class Uploader:
+  upload_attr_name = UPLOAD_ATTR_NAME
+  upload_attr_value = UPLOAD_ATTR_VALUE
+  max_file_size: int | None = None
+  upload_all_files = False
+
   def __init__(self, dongle_id: str, root: str):
     self.dongle_id = dongle_id
     self.api = Api(dongle_id)
@@ -83,7 +84,7 @@ class Uploader:
     self.last_filename = ""
 
     self.immediate_folders = ["crash/", "boot/"]
-    self.immediate_priority = {"qlog": 0, "qlog.zst": 0, "qcamera.ts": 1}
+    self.immediate_priority = {"qlog": 0, "qlog.zst": 0, "qcamera.mp4": 1}
 
   def list_upload_files(self, metered: bool) -> Iterator[tuple[str, str, str]]:
     r = self.params.get("AthenadRecentlyViewedRoutes")
@@ -105,7 +106,7 @@ class Uploader:
         # skip files already uploaded
         try:
           ctime = os.path.getctime(fn)
-          is_uploaded = getxattr(fn, UPLOAD_ATTR_NAME) == UPLOAD_ATTR_VALUE
+          is_uploaded = getxattr(fn, self.upload_attr_name) == self.upload_attr_value
         except OSError:
           cloudlog.event("uploader_getxattr_failed", key=key, fn=fn)
           # deleter could have deleted, so skip
@@ -119,7 +120,7 @@ class Uploader:
           if logdir in self.immediate_folders and (datetime.datetime.now() - datetime.datetime.fromtimestamp(ctime)) < dt:
             continue
 
-          if name == "qcamera.ts" and not any(logdir.startswith(r.split('|')[-1]) for r in requested_routes):
+          if name == "qcamera.mp4" and not any(logdir.startswith(r.split('|')[-1]) for r in requested_routes):
             continue
 
         yield name, key, fn
@@ -134,6 +135,9 @@ class Uploader:
     for name, key, fn in upload_files:
       if name in self.immediate_priority:
         return name, key, fn
+
+    if self.upload_all_files and upload_files:
+      return upload_files[0]
 
     return None
 
@@ -172,7 +176,7 @@ class Uploader:
     if sz == 0:
       # tag files of 0 size as uploaded
       success = True
-    elif name in MAX_UPLOAD_SIZES and sz > MAX_UPLOAD_SIZES[name]:
+    elif (self.max_file_size is not None and sz > self.max_file_size) or (name in MAX_UPLOAD_SIZES and sz > MAX_UPLOAD_SIZES[name]):
       cloudlog.event("uploader_too_large", key=key, fn=fn, sz=sz)
       success = True
     else:
@@ -185,7 +189,7 @@ class Uploader:
       except Exception as e:
         last_exc = (e, traceback.format_exc())
 
-      if stat is not None and stat.status_code in (200, 201, 401, 403, 412):
+      if stat is not None and stat.status_code in (200, 201, 204, 401, 403, 412):
         self.last_filename = fn
         dt = time.monotonic() - start_time
         if stat.status_code == 412:
@@ -203,7 +207,7 @@ class Uploader:
     if success:
       # tag file as uploaded
       try:
-        setxattr(fn, UPLOAD_ATTR_NAME, UPLOAD_ATTR_VALUE)
+        setxattr(fn, self.upload_attr_name, self.upload_attr_value)
       except OSError:
         cloudlog.event("uploader_setxattr_failed", exc=last_exc, key=key, fn=fn, sz=sz)
 
@@ -225,46 +229,7 @@ class Uploader:
 
 
 def main(exit_event: threading.Event | None = None) -> None:
-  if exit_event is None:
-    exit_event = threading.Event()
-
-  try:
-    set_core_affinity([0, 1, 2, 3])
-  except Exception:
-    cloudlog.exception("failed to set core affinity")
-
-  clear_locks(Paths.log_root())
-
-  params = Params()
-  dongle_id = params.get("DongleId")
-
-  if dongle_id is None:
-    cloudlog.info("uploader missing dongle_id")
-    raise Exception("uploader can't start without dongle id")
-
-  sm = messaging.SubMaster(['deviceState'])
-  uploader = Uploader(dongle_id, Paths.log_root())
-
-  backoff = 0.1
-  while not exit_event.is_set():
-    sm.update(0)
-    offroad = params.get_bool("IsOffroad")
-    network_type = sm['deviceState'].networkType if not force_wifi else NetworkType.wifi
-    if network_type == NetworkType.none:
-      if allow_sleep:
-        time.sleep(60 if offroad else 5)
-      continue
-
-    success = uploader.step(sm['deviceState'].networkType.raw, sm['deviceState'].networkMetered)
-    if success is None:
-      backoff = 60 if offroad else 5
-    elif success:
-      backoff = 0.1
-    else:
-      cloudlog.info("upload backoff %r", backoff)
-      backoff = min(backoff*2, 120)
-    if allow_sleep:
-      time.sleep(backoff + random.uniform(0, backoff))
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 if __name__ == "__main__":

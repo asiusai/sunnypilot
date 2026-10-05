@@ -17,7 +17,9 @@ from openpilot.common.markdown import parse_markdown
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.selfdrived.alertmanager import set_offroad_alert
 from openpilot.common.hardware import AGNOS, HARDWARE
-from openpilot.common.version import get_build_metadata, SP_BRANCH_MIGRATIONS
+from openpilot.common.version import get_build_metadata
+from openpilot.system.updated.vamos_update import (activate_vamos_update, prepare_vamos_update,
+                                                   should_skip_noop_vamos_fetch, vamos_update_supported)
 
 LOCK_FILE = os.getenv("UPDATER_LOCK_FILE", "/tmp/safe_staging_overlay.lock")
 STAGING_ROOT = os.getenv("UPDATER_STAGING_ROOT", "/data/safe_staging")
@@ -225,11 +227,8 @@ class Updater:
 
   @property
   def target_branch(self) -> str:
-    b: str | None = self.params.get("UpdaterTargetBranch")
-    if b is None:
-      b = self.get_branch(BASEDIR)
-    b = SP_BRANCH_MIGRATIONS.get((HARDWARE.get_device_type(), b), b)
-    return b
+    # The source-tracking upstream branch does not contain Asius services.
+    return "master"
 
   @property
   def update_ready(self) -> bool:
@@ -328,7 +327,7 @@ class Updater:
   def check_for_update(self) -> None:
     cloudlog.info("checking for updates")
 
-    excluded_branches = ('release2', 'release2-staging')
+    run(["git", "remote", "set-url", "origin", "https://github.com/asiusai/sunnypilot.git"], OVERLAY_MERGED)
 
     try:
       run(["git", "ls-remote", "origin", "HEAD"], OVERLAY_MERGED)
@@ -343,7 +342,7 @@ class Updater:
     for line in output.split('\n'):
       ls_remotes_re = r'(?P<commit_sha>\b[0-9a-f]{5,40}\b)(\s+)(refs\/heads\/)(?P<branch_name>.*$)'
       x = re.fullmatch(ls_remotes_re, line.strip())
-      if x is not None and x.group('branch_name') not in excluded_branches:
+      if x is not None and x.group('branch_name') == "master":
         self.branches[x.group('branch_name')] = x.group('commit_sha')
 
     cur_branch = self.get_branch(OVERLAY_MERGED)
@@ -357,8 +356,10 @@ class Updater:
 
   def fetch_update(self) -> None:
     cloudlog.info("attempting git fetch inside staging overlay")
+    run(["git", "remote", "set-url", "origin", "https://github.com/asiusai/sunnypilot.git"], OVERLAY_MERGED)
 
     self.params.put("UpdaterState", "downloading...", block=True)
+    self.params.remove("UpdaterProgress")
 
     # TODO: cleanly interrupt this and invalidate old update
     set_consistent_flag(False)
@@ -385,13 +386,25 @@ class Updater:
     r = [run(cmd, OVERLAY_MERGED) for cmd in cmds]
     cloudlog.info("git reset success: %s", '\n'.join(r))
 
-    # TODO: show agnos download progress
+    # TODO: show OS download progress
+    vamos_update_pending = False
     if AGNOS:
       handle_agnos_update()
+    elif vamos_update_supported():
+      vamos_update_pending = prepare_vamos_update(OVERLAY_MERGED, HARDWARE.get_os_version(), set_consistent_flag)
 
     # Create the finalized, ready-to-swap update
     self.params.put("UpdaterState", "finalizing update...", block=True)
+    if vamos_update_pending:
+      self.params.put("UpdaterProgress", 99, block=True)
     finalize_update()
+    if vamos_update_pending:
+      try:
+        activate_vamos_update()
+      except Exception:
+        set_consistent_flag(False)
+        raise
+      self.params.put("UpdaterProgress", 100, block=True)
     cloudlog.info("finalize success!")
 
 
@@ -455,7 +468,9 @@ def main() -> None:
         last_fetch = params.get("UpdaterLastFetchTime")
         timed_out = last_fetch is None or (datetime.datetime.now(datetime.UTC).replace(tzinfo=None) - last_fetch > datetime.timedelta(days=3))
         user_requested_fetch = wait_helper.user_request == UserRequest.FETCH
-        if params.get_bool("NetworkMetered") and not timed_out and not user_requested_fetch:
+        if should_skip_noop_vamos_fetch(updater.update_available, wait_helper.user_request, UserRequest.FETCH):
+          cloudlog.info("skipping fetch, vamOS checkout is already up to date")
+        elif params.get_bool("NetworkMetered") and not timed_out and not user_requested_fetch:
           cloudlog.info("skipping fetch, connection metered")
         elif wait_helper.user_request == UserRequest.CHECK:
           cloudlog.info("skipping fetch, only checking")

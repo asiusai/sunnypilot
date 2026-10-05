@@ -8,30 +8,25 @@ See the LICENSE.md file in the root directory for more details.
 from __future__ import annotations
 
 import base64
-import errno
 import gzip
 import json
 import os
-import ssl
 import threading
 import time
 
 from functools import partial
 from openpilot.system.athena.rpc import dispatcher
 from openpilot.common.params import Params, ParamKeyType
-from openpilot.common.realtime import set_core_affinity
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.hardware.hw import Paths
 from openpilot.system.athena.athenad import ws_send, jsonrpc_handler, \
-  recv_queue, UploadQueueCache, upload_queue, cur_upload_items, backoff, ws_manage, log_handler, start_local_proxy_shim, upload_handler, stat_handler
-from websocket import (ABNF, WebSocket, WebSocketException, WebSocketTimeoutException,
-                       create_connection, WebSocketConnectionClosedException)
+  recv_queue, ws_manage, log_handler, upload_handler, stat_handler
+from websocket import (ABNF, WebSocket, WebSocketTimeoutException,
+                       WebSocketConnectionClosedException)
 
 import openpilot.cereal.messaging as messaging
 from openpilot.sunnypilot.models.model_name import DEFAULT_MODEL, DEFAULT_BIG_MODEL
-from openpilot.sunnypilot.selfdrive.car.sync_sunnylink_params import update_car_list_param
-from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
-from openpilot.sunnypilot.sunnylink.utils import sunnylink_need_register, sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
+from openpilot.sunnypilot.sunnylink.utils import sunnylink_ready, get_param_as_byte, save_param_from_base64_encoded_string
 from openpilot.sunnypilot.sunnylink.capabilities import generate_capabilities, CAPABILITY_LABELS
 from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import generate_schema
 
@@ -255,78 +250,11 @@ def saveParams(params_to_update: dict[str, str], compression: bool = False) -> N
 
 
 def startLocalProxy(global_end_event: threading.Event, remote_ws_uri: str, local_port: int) -> dict[str, int]:
-  sunnylink_dongle_id = params.get("SunnylinkDongleId")
-  sunnylink_api = SunnylinkApi(sunnylink_dongle_id)
-
-  cloudlog.debug("athena.startLocalProxy.starting")
-  ws = create_connection(
-    remote_ws_uri, header={"Authorization": f"Bearer {sunnylink_api.get_token()}"}, enable_multithread=True, sslopt={"cert_reqs": ssl.CERT_NONE}
-  )
-
-  return start_local_proxy_shim(global_end_event, local_port, ws)
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 def main(exit_event: threading.Event | None = None):
-  try:
-    set_core_affinity([0, 1, 2, 3])
-  except Exception:
-    cloudlog.exception("failed to set core affinity")
-
-  while sunnylink_need_register(params):
-    cloudlog.info("Waiting for sunnylink registration to complete")
-    time.sleep(10)
-
-  sunnylink_dongle_id = params.get("SunnylinkDongleId")
-  sunnylink_api = SunnylinkApi(sunnylink_dongle_id)
-  UploadQueueCache.initialize(upload_queue)
-
-  update_car_list_param()
-
-  ws_uri = f"{SUNNYLINK_ATHENA_HOST}"
-  conn_start = None
-  conn_retries = 0
-  while (exit_event is None or not exit_event.is_set()) and sunnylink_ready(params):
-    try:
-      if conn_start is None:
-        conn_start = time.monotonic()
-
-      cloudlog.event("sunnylinkd.main.connecting_ws", ws_uri=ws_uri, retries=conn_retries)
-      ws = create_connection(
-        ws_uri,
-        header={"Authorization": f"Bearer {sunnylink_api.get_token()}"},
-        enable_multithread=True,
-        sslopt={"cert_reqs": ssl.CERT_NONE if "localhost" in ws_uri else ssl.CERT_REQUIRED},
-        timeout=SUNNYLINK_RECONNECT_TIMEOUT_S,
-      )
-      cloudlog.event("sunnylinkd.main.connected_ws", ws_uri=ws_uri, retries=conn_retries,
-                     duration=time.monotonic() - conn_start)
-      conn_start = None
-
-      conn_retries = 0
-      cur_upload_items.clear()
-
-      handle_long_poll(ws, exit_event)
-    except (KeyboardInterrupt, SystemExit):
-      break
-    except Exception as e:
-      conn_retries += 1
-      params.remove("LastSunnylinkPingTime")
-
-      if isinstance(e, (ConnectionError, TimeoutError, WebSocketException)):
-        cloudlog.warning(f"sunnylinkd.main.{type(e).__name__}")
-      elif isinstance(e, OSError):
-        name = errno.errorcode.get(e.errno or -1, "UNKNOWN")
-        msg = f"sunnylinkd.main.OSError.{name} ({e.errno})"
-        is_expected_error = e.errno in (errno.ENETDOWN, errno.ENETRESET, errno.ENETUNREACH)
-        cloudlog.warning(msg) if is_expected_error else cloudlog.exception(msg)
-      else:
-        cloudlog.exception("sunnylinkd.main.exception")
-
-    time.sleep(backoff(conn_retries))
-
-  if not sunnylink_ready(params):
-    cloudlog.debug("Reached end of sunnylinkd.main while sunnylink is not ready. Waiting 60s before retrying")
-    time.sleep(60)
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 if __name__ == "__main__":

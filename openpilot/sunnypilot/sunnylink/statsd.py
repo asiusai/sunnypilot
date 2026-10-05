@@ -2,7 +2,6 @@
 import base64
 import json
 import os
-import threading
 import traceback
 
 import zmq
@@ -254,25 +253,7 @@ def stats_main(end_event):
 
 
 def main():
-  rk = Ratekeeper(1, print_delay_threshold=None)
-  end_event = threading.Event()
-
-  threads = [
-    threading.Thread(target=stats_main, args=(end_event,)),
-    threading.Thread(target=sp_stats, args=(end_event,)),
-  ]
-
-  for t in threads:
-    t.start()
-
-  try:
-    while all(t.is_alive() for t in threads):
-      rk.keep_time()
-  finally:
-    end_event.set()
-
-  for t in threads:
-    t.join()
+  raise RuntimeError("This service is disabled in the Asius fork.")
 
 
 if __name__ == "__main__":

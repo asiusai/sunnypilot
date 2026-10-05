@@ -1,10 +1,6 @@
-import jwt
 import os
-import requests
 import unicodedata
-from datetime import datetime, timedelta, UTC
 from openpilot.common.hardware.hw import Paths
-from openpilot.common.version import get_version
 
 # name: jwt signature algorithm
 KEYS = {"id_rsa": "RS256",
@@ -28,21 +24,7 @@ class BaseApi:
     return self.api_get(endpoint, method=method, timeout=timeout, access_token=access_token, **params)
 
   def _get_token(self, payload_extra=None, expiry_hours=1, **extra_payload):
-    now = datetime.now(UTC).replace(tzinfo=None)
-    payload = {
-      'identity': self.dongle_id,
-      'nbf': now,
-      'iat': now,
-      'exp': now + timedelta(hours=expiry_hours),
-      **extra_payload
-    }
-    if payload_extra is not None:
-      payload.update(payload_extra)
-    assert self.private_key is not None
-    token = jwt.encode(payload, self.private_key, algorithm=self.jwt_algorithm)
-    if isinstance(token, bytes):
-      token = token.decode('utf8')
-    return token
+    raise RuntimeError("Legacy cloud services are disabled in the Asius fork.")
 
   def get_token(self, payload_extra=None, expiry_hours=1):
     return self._get_token(payload_extra, expiry_hours)
@@ -53,16 +35,7 @@ class BaseApi:
     return ascii_encoded_text.decode()
 
   def api_get(self, endpoint, method='GET', timeout=None, access_token=None, session=None, json=None, **params):
-    headers = {}
-    if access_token is not None:
-      headers['Authorization'] = "JWT " + access_token
-
-    version = self.remove_non_ascii_chars(get_version())
-    headers['User-Agent'] = self.user_agent + version
-
-    # TODO: add session to Api
-    req = requests if session is None else session
-    return req.request(method, f"{self.api_host}/{endpoint}", timeout=timeout, headers=headers, json=json, params=params)
+    raise RuntimeError("Legacy cloud services are disabled in the Asius fork.")
 
   @staticmethod
   def get_key_pair() -> tuple[str, str, str] | tuple[None, None, None]:

@@ -1,18 +1,12 @@
 import base64
 import gzip
 import json
-from openpilot.sunnypilot.sunnylink.api import SunnylinkApi, UNREGISTERED_SUNNYLINK_DONGLE_ID
+from openpilot.sunnypilot.sunnylink.api import SunnylinkApi
 from openpilot.common.params import Params, ParamKeyType
-from openpilot.common.version import is_prebuilt
 
 
 def get_sunnylink_status(params=None) -> tuple[bool, bool, bool]:
-  """Get the status of Sunnylink on the device. Returns a tuple of (is_sunnylink_enabled, is_registered)."""
-  params = params or Params()
-  is_sunnylink_enabled = params.get_bool("SunnylinkEnabled")
-  is_registered = params.get("SunnylinkDongleId") not in (None, UNREGISTERED_SUNNYLINK_DONGLE_ID)
-  is_on_temporary_fault = params.get_bool("SunnylinkTempFault")
-  return is_sunnylink_enabled, is_registered, is_on_temporary_fault
+  return False, False, False
 
 
 def sunnylink_ready(params=None) -> bool:
@@ -35,25 +29,7 @@ def sunnylink_need_register(params=None) -> bool:
 
 
 def register_sunnylink():
-  """Register the device with Sunnylink if it is enabled."""
-  extra_args = {}
-
-  if not Params().get_bool("SunnylinkEnabled"):
-    print("Sunnylink is not enabled. Exiting.")
-    exit(0)
-
-  if not is_prebuilt():
-    extra_args = {
-      "verbose": True,
-      "timeout": 60
-    }
-
-  try:
-    sunnylink_id = SunnylinkApi(None).register_device(None, **extra_args)
-    print(f"SunnyLinkId: {sunnylink_id}")
-  except Exception:
-    Params().put_bool("SunnylinkTempFault", True, block=True)
-    raise
+  return None
 
 
 def get_api_token():

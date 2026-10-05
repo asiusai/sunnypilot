@@ -9,7 +9,6 @@ from openpilot.selfdrive.ui.mici.layouts.settings.settings import SettingsBigBut
 from openpilot.selfdrive.ui.mici.layouts.settings.device import DeviceLayoutMici
 from openpilot.selfdrive.ui.mici.widgets.button import BigCircleButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationDialog, BigDialog
-from openpilot.selfdrive.ui.sunnypilot.mici.layouts.sunnylink import SunnylinkLayoutMici
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.models import ModelsLayoutMici
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight
@@ -42,9 +41,6 @@ class SettingsLayoutSP(OP.SettingsLayout):
                                                 BIG_ICON_SIZE)
     self.icon_offroad_slider = gui_app.texture("icons_mici/settings/device/lkas.png", BIG_ICON_SIZE, BIG_ICON_SIZE)
 
-    sunnylink_panel = SunnylinkLayoutMici()
-    sunnylink_btn = SunnylinkBigButton(tr("sunnylink"), "", gui_app.texture("../../sunnypilot/selfdrive/assets/icons_mici/sunnylink.png", 76, 44))
-    sunnylink_btn.set_click_callback(lambda: gui_app.push_widget(sunnylink_panel))
 
     models_panel = ModelsLayoutMici()
     models_btn = SettingsBigButton(tr("models"), "", gui_app.texture("../../sunnypilot/selfdrive/assets/offroad/icon_models.png", ICON_SIZE, ICON_SIZE))
@@ -67,7 +63,6 @@ class SettingsLayoutSP(OP.SettingsLayout):
     items = self._scroller._items.copy()
 
     items.insert(1, models_btn)
-    items.insert(5, sunnylink_btn)
 
     # front slots (only one ever visible at a time): exit-always-offroad, then enable-onroad
     items.insert(0, self._enable_offroad_btn_onroad)

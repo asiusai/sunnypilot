@@ -171,7 +171,7 @@ class UIStateSP:
     self.rocket_fuel = self.params.get_bool("RocketFuel")
     self.speed_limit_mode = self.params.get("SpeedLimitMode", return_default=True)
     self.standstill_timer = self.params.get_bool("StandstillTimer")
-    self.sunnylink_enabled = self.params.get_bool("SunnylinkEnabled")
+    self.sunnylink_enabled = False
     self.torque_bar = self.params.get_bool("TorqueBar")
     self.enforce_torque_control = self.params.get_bool("EnforceTorqueControl")
     self.custom_torque_params = self.params.get_bool("CustomTorqueParams")

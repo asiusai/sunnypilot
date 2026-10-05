@@ -101,7 +101,7 @@ class SunnylinkConsentPage(Widget):
 class SunnylinkOnboarding:
   def __init__(self):
     self.consent_page = SunnylinkConsentPage(done_callback=self._on_done)
-    self.consent_done: bool = ui_state.params.get("CompletedSunnylinkConsentVersion") in {sunnylink_consent_version, sunnylink_consent_declined}
+    self.consent_done: bool = True
 
   @property
   def completed(self) -> bool:

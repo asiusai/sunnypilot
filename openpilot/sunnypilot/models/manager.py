@@ -247,6 +247,13 @@ class ModelManagerSP:
     model_manager_state = msg.modelManagerSP
     if self.selected_bundle:
       model_manager_state.selectedBundle = self.selected_bundle
+      # App polling must not miss a failure followed immediately by an idle message.
+      if self.selected_bundle.status in (custom.ModelManagerSP.DownloadStatus.downloaded, custom.ModelManagerSP.DownloadStatus.failed):
+        progress = [m.artifact.downloadProgress.progress for m in self.selected_bundle.models if m.artifact.fileName]
+        result = {"id": self.selected_bundle.ref, "status": str(self.selected_bundle.status),
+                  "progress": sum(progress) / len(progress) if progress else 0}
+        if self.params.get("ModelManager_DownloadResult") != result:
+          self.params.put("ModelManager_DownloadResult", result, block=True)
 
     if self.active_bundle:
       model_manager_state.activeBundle = self.active_bundle

@@ -25,12 +25,15 @@ def getModelState(source: str = "qcom") -> dict:
   bundles = get_cached_bundles(params, source)
   selected = get_selected_bundle(params, source)
   pending = params.get("ModelManager_DownloadRef")
+  result = params.get("ModelManager_DownloadResult")
+  download = result if isinstance(result, dict) and any(b.ref == result.get('id') for b in bundles) else None
+  if download and pending and download['id'] != pending:
+    download = None
   with _lock:
     if _state is None:
       _state = messaging.SubMaster(['modelManagerSP'])
     _state.update(0)
     fresh = _state.seen['modelManagerSP'] and 0 <= (time.monotonic_ns() - _state.logMonoTime['modelManagerSP']) / 1e9 < 5
-    download = None
     if fresh:
       bundle = _state['modelManagerSP'].selectedBundle
       if bundle.ref and any(b.ref == bundle.ref for b in bundles):
@@ -56,6 +59,7 @@ def selectModel(source: str, ref: str | None) -> dict:
     # Only the manager accepts catalog URLs and publishes verified active bundles.
     # App requests contain a catalog reference, never an artifact or download URL.
     require_ignition_off()
+    params.remove("ModelManager_DownloadResult")
     if ref is None:
       params.remove("ModelManager_DownloadRef")
       params.remove(ACTIVE_BUNDLE_KEYS[source])

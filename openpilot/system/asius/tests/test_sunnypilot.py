@@ -147,3 +147,24 @@ def test_model_choices_and_progress_come_from_device(params, monkeypatch):
   sm.logMonoTime['modelManagerSP'] = time.monotonic_ns() - 10_000_000_000
   assert models.getModelState()['download'] is None
   assert not models.getModelState()['available']
+
+
+def test_failed_model_download_remains_visible_after_manager_returns_to_idle(params, monkeypatch):
+  from openpilot.cereal import custom
+  from openpilot.sunnypilot.models.manager import ModelManagerSP
+  bundle = custom.ModelManagerSP.ModelBundle(ref='failed-model', status='failed')
+  manager = ModelManagerSP.__new__(ModelManagerSP)
+  manager.params = params
+  manager.pm = Mock()
+  manager.active_bundle = None
+  manager.available_models = [bundle]
+  manager.selected_bundle = bundle
+  manager._report_status()
+  manager.selected_bundle = None
+  manager._report_status()
+  monkeypatch.setattr(models, 'get_cached_bundles', lambda p, source: [bundle])
+  monkeypatch.setattr(models, 'get_selected_bundle', lambda p, source: None)
+  sm = Mock()
+  sm.seen = {'modelManagerSP': False}
+  monkeypatch.setattr(models, '_state', sm)
+  assert models.getModelState()['download'] == {'id': 'failed-model', 'status': 'failed', 'progress': 0}

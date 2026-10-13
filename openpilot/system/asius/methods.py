@@ -153,7 +153,7 @@ BLUETOOTH_STATE_FIELDS = {
   "peripheralState": ("pandaType", "voltage", "current"),
   "extrinsicsCalibration": ("calStatus", "calPerc"),
   "gpsLocation": ("hasFix", "latitude", "longitude", "horizontalAccuracy", "source", "unixTimestampMillis"),
-  "selfdriveState": ("enabled", "active", "engageable", "alertText1", "alertText2", "alertStatus", "alertSize"),
+  "selfdriveState": ("enabled", "active", "engageable", "alertText1", "alertText2", "alertStatus", "alertSize", "alertType"),
 }
 dispatcher["echo"] = lambda s: s
 for method in (
@@ -895,7 +895,7 @@ def _live_state_snapshot(sm: messaging.SubMaster, params: Params, *, compact: bo
       if service == "gpsLocation" and not (sm.alive[service] and sm.valid[service]):
         services[service] = {"hasFix": False}
         continue
-      if service == "carState" and not (sm.alive[service] and sm.valid[service]):
+      if service in ("carState", "selfdriveState", "onroadEvents") and not (sm.alive[service] and sm.valid[service]):
         continue
       if sm.recv_frame[service] > 0:
         data = sm[service]
